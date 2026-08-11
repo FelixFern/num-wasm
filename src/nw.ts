@@ -21,6 +21,10 @@ interface NumWasmExports {
   wasm_full(shapePtr: number, shapeLen: number, value: number, outPtr: number): number;
   wasm_arange(start: number, stop: number, step: number, outPtr: number): number;
   wasm_linspace(start: number, stop: number, count: number, outPtr: number): number;
+  wasm_reshape(dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number, newShapePtr: number, newShapeLen: number, outPtr: number): number;
+  wasm_transpose(dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number, outPtr: number): number;
+  wasm_flatten(dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number, outPtr: number): number;
+  wasm_squeeze(dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number, outPtr: number): number;
 }
 
 export class NumWasm {
@@ -47,22 +51,28 @@ export class NumWasm {
   }
 
   private _allocOut(): number {
-    const ptr = this._exports.wasm_alloc(2 * USIZE);
+    const ptr = this._exports.wasm_alloc(4 * USIZE);
     if (ptr === 0) throw new Error("alloc failed for out buffer");
     return ptr;
   }
 
-  private _readResult(outPtr: number): number[] {
-    const out = new Uint32Array(this._memory.buffer, outPtr, 2);
+  private _readResult(outPtr: number): NdArray {
+    const out = new Uint32Array(this._memory.buffer, outPtr, 4);
     const dataPtr = out[0];
     const dataLen = out[1];
-    this._exports.wasm_free(outPtr, 2 * USIZE);
+    const shapePtr = out[2];
+    const shapeLen = out[3];
+    this._exports.wasm_free(outPtr, 4 * USIZE);
 
     const data = Array.from(
       new Float64Array(this._memory.buffer, dataPtr, dataLen),
     );
     this._exports.wasm_free(dataPtr, dataLen * F64);
-    return data;
+
+    const shape = Array.from(new Uint32Array(this._memory.buffer, shapePtr, shapeLen));
+    this._exports.wasm_free(shapePtr, shapeLen * USIZE);
+
+    return { data, shape };
   }
 
   private _callWithShape(
@@ -75,7 +85,30 @@ export class NumWasm {
     const rc = wasmFn(s.ptr, shape.length, ...extraArgs, outPtr);
     this._exports.wasm_free(s.ptr, s.byteLen);
     if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
-    return { data: this._readResult(outPtr), shape: [...shape] };
+    return this._readResult(outPtr);
+  }
+
+  private _writeArray(arr: NdArray): { dataPtr: number; shapePtr: number; shapeLen: number } {
+    const dataPtr = this._exports.wasm_alloc(arr.data.length * F64);
+    if (dataPtr === 0) throw new Error("alloc failed for data");
+    new Float64Array(this._memory.buffer, dataPtr, arr.data.length).set(arr.data);
+
+    const s = this._writeShape(arr.shape);
+    return { dataPtr, shapePtr: s.ptr, shapeLen: arr.shape.length };
+  }
+
+  private _callOnArray(
+    wasmFn: (...args: number[]) => number,
+    arr: NdArray,
+    ...extraArgs: number[]
+  ): NdArray {
+    const input = this._writeArray(arr);
+    const outPtr = this._allocOut();
+    const rc = wasmFn(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, ...extraArgs, outPtr);
+    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
+    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
+    return this._readResult(outPtr);
   }
 
   zeros(shape: number[]): NdArray {
@@ -94,15 +127,35 @@ export class NumWasm {
     const outPtr = this._allocOut();
     const rc = this._exports.wasm_arange(start, stop, step, outPtr);
     if (rc !== 0) throw new Error(`arange failed (rc=${rc})`);
-    const data = this._readResult(outPtr);
-    return { data, shape: [data.length] };
+    return this._readResult(outPtr);
   }
 
   linspace(start: number, stop: number, count: number): NdArray {
     const outPtr = this._allocOut();
     const rc = this._exports.wasm_linspace(start, stop, count, outPtr);
     if (rc !== 0) throw new Error(`linspace failed (rc=${rc})`);
-    const data = this._readResult(outPtr);
-    return { data, shape: [data.length] };
+    return this._readResult(outPtr);
+  }
+
+  reshape(arr: NdArray, newShape: number[]): NdArray {
+    const ns = this._writeShape(newShape);
+    const res = this._callOnArray(
+      (d, dl, s, l, out) => this._exports.wasm_reshape(d, dl, s, l, ns.ptr, newShape.length, out),
+      arr,
+    );
+    this._exports.wasm_free(ns.ptr, ns.byteLen);
+    return res;
+  }
+
+  transpose(arr: NdArray): NdArray {
+    return this._callOnArray(this._exports.wasm_transpose, arr);
+  }
+
+  flatten(arr: NdArray): NdArray {
+    return this._callOnArray(this._exports.wasm_flatten, arr);
+  }
+
+  squeeze(arr: NdArray): NdArray {
+    return this._callOnArray(this._exports.wasm_squeeze, arr);
   }
 }
