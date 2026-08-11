@@ -15,7 +15,8 @@ num-wasm/
 ├── src/
 │   ├── core/
 │   │   ├── ndarray.zig     # NDArray struct (init, deinit, getItem, setItem, flatIndex)
-│   │   └── creation.zig    # zeros, ones, full, arange, linspace
+│   │   ├── creation.zig    # zeros, ones, full, arange, linspace
+│   │   └── shape.zig       # reshape, transpose, flatten, squeeze
 │   ├── wasm_api.zig        # WASM exports (thin wrapper)
 │   ├── root.zig            # Module re-exports
 │   ├── main.zig            # CLI playground
@@ -37,9 +38,9 @@ num-wasm/
 ```bash
 npm install
 
-zig build test          # run native Zig tests (17 tests)
+zig build test          # run native Zig tests (22 tests)
 zig build wasm          # build WASM binary to zig-out/bin/
-npx tsx tests/test.ts   # run TypeScript tests (8 tests)
+npx tsx tests/test.ts   # run TypeScript tests (14 tests)
 npm test                # same as above
 ```
 
@@ -55,6 +56,12 @@ const b = nw.ones([2, 3]);      // { data: [1,1,1,1,1,1], shape: [2,3] }
 const c = nw.full([2, 2], 7.5); // { data: [7.5,7.5,7.5,7.5], shape: [2,2] }
 const d = nw.arange(0, 5, 1);   // { data: [0,1,2,3,4], shape: [5] }
 const e = nw.linspace(0, 1, 5); // { data: [0,0.25,0.5,0.75,1], shape: [5] }
+
+// shape manipulation
+const f = nw.reshape(a, [3, 2]);      // { data: [0,1,2,3,4,5], shape: [3,2] }
+const g = nw.transpose(nw.reshape(a, [2, 3])); // { data: [0,3,1,4,2,5], shape: [3,2] }
+const h = nw.flatten(g);              // { data: [0,3,1,4,2,5], shape: [6] }
+const i = nw.squeeze(nw.reshape(a, [3, 1, 2])); // { data: [0,1,2,3,4,5], shape: [3,2] }
 ```
 
 ## Design Choices
@@ -73,7 +80,7 @@ These simplifications keep the codebase approachable. They can be upgraded later
 | 1     | Toolchain setup, hello WASM                         | Done     |
 | 2     | NDArray core data structure                         | Done     |
 | 3     | Array creation functions                            | Done     |
-| 4     | Shape manipulation (reshape, transpose, flatten)    | Upcoming |
+| 4     | Shape manipulation (reshape, transpose, flatten, squeeze) | Done |
 | 5     | Broadcasting                                        | Upcoming |
 | 6     | Element-wise operations (add, multiply, sqrt, etc.) | Upcoming |
 | 7     | Reduction operations (sum, mean, max, min)          | Upcoming |
