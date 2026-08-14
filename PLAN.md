@@ -161,12 +161,12 @@ General formula: `flat = Σ(indices[d] * product(shape[d+1..]))`
 
 **Goal**: Clean JS API that hides pointer/memory management.
 
-- [ ] **10.1** `NumWasm` class — async `init()` loads WASM, stores exports
-- [ ] **10.2** `NdArray` JS class — holds pointer + shape. Methods: `.toArray()`, `.toTypedArray()`, `.free()`
-- [ ] **10.3** `nw.array(jsData)` — detect shape from nesting, flatten, copy into WASM, return `NdArray`
-- [ ] **10.4** Method wrappers: `nw.add(a, b)`, `nw.sum(a, {axis: 0})`, `nw.reshape(a, [3, 4])`, etc.
-- [ ] **10.5** `FinalizationRegistry` — auto-cleanup with console warning if user forgets `.free()`
-- [ ] **10.6** Error handling — check null pointers from WASM (allocation failures), throw typed JS errors
+- [X] **10.1** `NumWasm` class — async `init()` loads WASM, stores exports
+- [X] **10.2** `NdArray` JS class — holds pointer + shape. Methods: `.toArray()`, `.toTypedArray()`, `.free()`
+- [X] **10.3** `nw.array(jsData)` — detect shape from nesting, flatten, copy into WASM, return `NdArray`
+- [X] **10.4** Method wrappers: `nw.add(a, b)`, `nw.sum(a, {axis: 0})`, `nw.reshape(a, [3, 4])`, etc.
+- [X] **10.5** `FinalizationRegistry` — auto-cleanup with console warning if user forgets `.free()`
+- [X] **10.6** Error handling — check null pointers from WASM (allocation failures), throw typed JS errors
 
 **Target API**:
 

@@ -349,13 +349,10 @@ async function main(): Promise<void> {
   });
 
   test("nw.matmul identity preserves", () => {
-    const a = nw.reshape(nw.arange(1, 7, 1), [2, 3]); // 1..6
-    const ident = nw.zeros([3, 3]);
-    ident.data[0] = 1;
-    ident.data[4] = 1;
-    ident.data[8] = 1;
+    const a = nw.array([[1, 2, 3], [4, 5, 6]]);
+    const ident = nw.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]]);
     const r = nw.matmul(a, ident);
-    assert.deepEqual(r.data, a.data);
+    assert.deepEqual(r.data, [1, 2, 3, 4, 5, 6]);
   });
 
   test("nw.matmul incompatible throws", () => {
@@ -369,6 +366,52 @@ async function main(): Promise<void> {
     const r = nw.outer(a, b);
     assert.deepEqual(r.shape, [2, 3]);
     assert.deepEqual(r.data, [3, 4, 5, 6, 8, 10]);
+  });
+
+  console.log("\nnw.array:");
+  test("nw.array([[1,2,3],[4,5,6]]) infers shape", () => {
+    const a = nw.array([[1, 2, 3], [4, 5, 6]]);
+    assert.deepEqual(a.shape, [2, 3]);
+    assert.deepEqual(a.toArray(), [1, 2, 3, 4, 5, 6]);
+  });
+
+  test("nw.array 3D infers shape", () => {
+    const a = nw.array([[[1], [2]], [[3], [4]]]);
+    assert.deepEqual(a.shape, [2, 2, 1]);
+    assert.deepEqual(a.data, [1, 2, 3, 4]);
+  });
+
+  test("nw.array scalar (empty) shape", () => {
+    const a = nw.array([]);
+    assert.deepEqual(a.shape, [0]);
+    assert.deepEqual(a.toArray(), []);
+  });
+
+  console.log("\nNdArray class:");
+  test("toTypedArray returns copy, mutate safe", () => {
+    const a = nw.array([1, 2, 3]);
+    const t = a.toTypedArray();
+    t[0] = 999;
+    assert.equal(a.toArray()[0], 1);
+  });
+
+  test("free is idempotent", () => {
+    const a = nw.array([1, 2, 3]);
+    a.free();
+    a.free();
+    assert.deepEqual(a.shape, [3]);
+  });
+
+  console.log("\nTarget API example from plan:");
+  test("plan example works end-to-end", () => {
+    const a = nw.array([[1, 2, 3], [4, 5, 6]]);
+    const b = nw.ones([2, 3]);
+    const c = nw.add(a, b);
+    const s = nw.sum(c, { axis: 0 }) as { toArray(): number[] };
+    assert.deepEqual(s.toArray(), [7, 9, 11]);
+    a.free();
+    b.free();
+    c.free();
   });
 
   console.log(`\n${"─".repeat(40)}`);
