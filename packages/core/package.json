@@ -48,6 +48,10 @@
     "node": ">=18"
   },
   "sideEffects": false,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "bugs": {
     "url": "https://github.com/FelixFern/numwasm/issues"
   },
