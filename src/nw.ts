@@ -49,6 +49,9 @@ interface NumWasmExports {
   wasm_max_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
   wasm_min_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
   wasm_prod_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
+  wasm_slice(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, dim: number, start: number, stop: number, step: number, outPtr: number): number;
+  wasm_index_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, dim: number, index: number, outPtr: number): number;
+  wasm_where(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, maskPtr: number, maskLen: number, outPtr: number): number;
 }
 
 export class NumWasm {
@@ -357,5 +360,40 @@ export class NumWasm {
 
   argmin(a: NdArray): number {
     return this._reduceAll(this._exports.wasm_argmin, a);
+  }
+
+  slice(arr: NdArray, dim: number, start: number, stop: number, step = 1): NdArray {
+    const input = this._writeArray(arr);
+    const outPtr = this._allocOut();
+    const rc = this._exports.wasm_slice(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, dim, start, stop, step, outPtr);
+    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
+    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    if (rc !== 0) throw new Error(`slice failed (rc=${rc})`);
+    return this._readResult(outPtr);
+  }
+
+  indexAxis(arr: NdArray, dim: number, index: number): NdArray {
+    const input = this._writeArray(arr);
+    const outPtr = this._allocOut();
+    const rc = this._exports.wasm_index_axis(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, dim, index, outPtr);
+    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
+    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    if (rc !== 0) throw new Error(`indexAxis failed (rc=${rc})`);
+    return this._readResult(outPtr);
+  }
+
+  where(arr: NdArray, mask: number[]): NdArray {
+    const input = this._writeArray(arr);
+    if (mask.length !== arr.data.length) throw new Error("mask length mismatch");
+    const maskPtr = this._exports.wasm_alloc(mask.length * F64);
+    if (maskPtr === 0) throw new Error("alloc failed for mask");
+    new Float64Array(this._memory.buffer, maskPtr, mask.length).set(mask);
+    const outPtr = this._allocOut();
+    const rc = this._exports.wasm_where(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, maskPtr, mask.length, outPtr);
+    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
+    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    this._exports.wasm_free(maskPtr, mask.length * F64);
+    if (rc !== 0) throw new Error(`where failed (rc=${rc})`);
+    return this._readResult(outPtr);
   }
 }

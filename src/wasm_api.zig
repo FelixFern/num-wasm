@@ -7,6 +7,7 @@ const elementwise = @import("core/elementwise.zig");
 const NDArray = @import("core/ndarray.zig").NDArray;
 const reduce = @import("core/reduce.zig");
 const shaper = @import("core/shape.zig");
+const slicing = @import("core/slicing.zig");
 
 export fn wasm_alloc(len: usize) usize {
     const slice = wasm_allocator.alloc(u8, len) catch return 0;
@@ -295,4 +296,26 @@ export fn wasm_min_axis(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_s
 
 export fn wasm_prod_axis(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, axis: usize, out_ptr: usize) i32 {
     return callReduceAxis(reduce.prodAxis, a_ptr, a_data_len, a_shape_ptr, a_shape_len, axis, out_ptr);
+}
+
+export fn wasm_slice(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, dim: usize, start: i32, stop: i32, step: i32, out_ptr: usize) i32 {
+    const a = arrayFromPtrs(a_ptr, a_data_len, a_shape_ptr, a_shape_len);
+    var res = slicing.sliceDim(wasm_allocator, &a, dim, start, stop, step) catch return -1;
+    writeResult(&res, out_ptr);
+    return 0;
+}
+
+export fn wasm_index_axis(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, dim: usize, index: i32, out_ptr: usize) i32 {
+    const a = arrayFromPtrs(a_ptr, a_data_len, a_shape_ptr, a_shape_len);
+    var res = slicing.indexAxis(wasm_allocator, &a, dim, index) catch return -1;
+    writeResult(&res, out_ptr);
+    return 0;
+}
+
+export fn wasm_where(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, mask_ptr: usize, mask_len: usize, out_ptr: usize) i32 {
+    const a = arrayFromPtrs(a_ptr, a_data_len, a_shape_ptr, a_shape_len);
+    const mask = dataSlice(mask_ptr, mask_len);
+    var res = slicing.whereMask(wasm_allocator, &a, mask) catch return -1;
+    writeResult(&res, out_ptr);
+    return 0;
 }
