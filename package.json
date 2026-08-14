@@ -13,7 +13,8 @@
     "./browser": {
       "types": "./dist/nw.browser.d.ts",
       "default": "./dist/nw.browser.js"
-    }
+    },
+    "./dist/num-wasm.wasm": "./dist/num-wasm.wasm"
   },
   "files": [
     "dist",
