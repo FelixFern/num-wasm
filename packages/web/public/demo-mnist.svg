@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="56" fill="#18181b"/>
+  <g stroke="#3f3f46" stroke-width="3">
+    <line x1="150" y1="160" x2="270" y2="170"/>
+    <line x1="150" y1="232" x2="270" y2="218"/>
+    <line x1="150" y1="304" x2="270" y2="294"/>
+    <line x1="150" y1="376" x2="270" y2="366"/>
+    <line x1="150" y1="448" x2="270" y2="438"/>
+    <line x1="270" y1="170" x2="380" y2="256"/>
+    <line x1="270" y1="218" x2="380" y2="256"/>
+    <line x1="270" y1="294" x2="380" y2="256"/>
+    <line x1="270" y1="366" x2="380" y2="256"/>
+    <line x1="270" y1="438" x2="380" y2="256"/>
+    <line x1="380" y1="256" x2="452" y2="180"/>
+    <line x1="380" y1="256" x2="452" y2="256"/>
+    <line x1="380" y1="256" x2="452" y2="332"/>
+  </g>
+  <g fill="#7be36f">
+    <circle cx="150" cy="160" r="16"/>
+    <circle cx="150" cy="232" r="16"/>
+    <circle cx="150" cy="304" r="16"/>
+    <circle cx="150" cy="376" r="16"/>
+    <circle cx="150" cy="448" r="16"/>
+  </g>
+  <g fill="#ffb000">
+    <circle cx="270" cy="170" r="16"/>
+    <circle cx="270" cy="218" r="16"/>
+    <circle cx="270" cy="294" r="16"/>
+    <circle cx="270" cy="366" r="16"/>
+    <circle cx="270" cy="438" r="16"/>
+  </g>
+  <g fill="#7be36f">
+    <circle cx="380" cy="256" r="16"/>
+    <circle cx="452" cy="180" r="16"/>
+    <circle cx="452" cy="256" r="16"/>
+    <circle cx="452" cy="332" r="16"/>
+  </g>
+</svg>

@@ -1,4 +1,6 @@
+.DS_Store
 .zig-cache
 node_modules
 PR.md
 dist
+zig-out

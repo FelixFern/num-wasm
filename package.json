@@ -1,60 +1,15 @@
 {
-  "name": "num-wasm",
-  "version": "1.0.0",
-  "description": "NumPy-like array library written in Zig, compiled to WebAssembly for JavaScript/TypeScript",
-  "main": "dist/nw.js",
-  "types": "dist/nw.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/nw.d.ts",
-      "require": "./dist/nw.js",
-      "default": "./dist/nw.js"
-    },
-    "./browser": {
-      "types": "./dist/nw.browser.d.ts",
-      "default": "./dist/nw.browser.js"
-    },
-    "./dist/num-wasm.wasm": "./dist/num-wasm.wasm"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "docs/PLAN.md",
-    "docs/USAGE.md"
-  ],
+  "name": "num-wasm-monorepo",
+  "private": true,
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/copy-wasm.mjs",
-    "prepublishOnly": "zig build wasm && pnpm run build",
-    "typecheck": "tsc --noEmit",
-    "test": "tsx tests/test.ts"
+    "dev": "pnpm --filter @felixfern/num-wasm-web dev",
+    "build": "pnpm -r build",
+    "build:lib": "pnpm --filter @felixfern/num-wasm build",
+    "build:web": "pnpm --filter @felixfern/num-wasm-web build",
+    "test": "pnpm --filter @felixfern/num-wasm test",
+    "typecheck": "pnpm --filter @felixfern/num-wasm typecheck"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/FelixFern/numwasm.git"
-  },
-  "keywords": [
-    "numpy",
-    "ndarray",
-    "array",
-    "wasm",
-    "webassembly",
-    "zig",
-    "neural-network",
-    "machine-learning"
-  ],
-  "author": "felixfern",
-  "license": "ISC",
   "engines": {
-    "node": ">=18"
-  },
-  "sideEffects": false,
-  "bugs": {
-    "url": "https://github.com/FelixFern/numwasm/issues"
-  },
-  "homepage": "https://github.com/FelixFern/numwasm#readme",
-  "devDependencies": {
-    "@types/node": "^25.5.0",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "node": ">=20"
   }
 }

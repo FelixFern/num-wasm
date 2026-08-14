@@ -1,0 +1,134 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Semver bump type"
+        required: true
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify on main
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "Releases must be run from main." >&2
+            exit 1
+          fi
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Working tree is dirty. Commit or stash changes first." >&2
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v1
+
+      - name: Build WASM
+        working-directory: packages/core
+        run: zig build wasm
+
+      - name: Run tests
+        run: pnpm --filter @felixfern/num-wasm test
+
+      - name: Bump version
+        id: bump
+        run: |
+          pnpm --filter @felixfern/num-wasm version ${{ inputs.bump }} --no-git-tag-version
+          echo "version=$(node -p "require('./packages/core/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: pnpm --filter @felixfern/num-wasm run build
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            RANGE="HEAD"
+            PREV_TAG="beginning of time"
+          else
+            RANGE="${PREV_TAG}..HEAD"
+          fi
+
+          {
+            echo "## ${VERSION}"
+            echo ""
+            echo "> Released on $(date -u +%Y-%m-%d)"
+            echo ""
+            echo "Changes since ${PREV_TAG}:"
+            echo ""
+            git log --pretty=format:"- %s" ${RANGE}
+            echo ""
+            echo ""
+          } > /tmp/release-notes.md
+
+          if [ -f packages/core/CHANGELOG.md ]; then
+            cat packages/core/CHANGELOG.md >> /tmp/release-notes.md
+          fi
+          cp /tmp/release-notes.md packages/core/CHANGELOG.md
+
+          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+          cat /tmp/release-notes.md >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and tag
+        run: |
+          VERSION="v${{ steps.bump.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/core/package.json pnpm-lock.yaml packages/core/CHANGELOG.md
+          git commit -m "chore: release v${{ steps.bump.outputs.version }}"
+          git tag "${VERSION}"
+
+      - name: Publish to npm
+        run: pnpm --filter @felixfern/num-wasm publish --no-git-checks
+
+      - name: Push commit and tag
+        run: |
+          VERSION="v${{ steps.bump.outputs.version }}"
+          git push origin main
+          git push origin "${VERSION}"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="v${{ steps.bump.outputs.version }}"
+          gh release create "${VERSION}" \
+            --title "${VERSION}" \
+            --notes "${{ steps.changelog.outputs.notes }}"
