@@ -3,6 +3,7 @@ const wasm_allocator = std.heap.wasm_allocator;
 
 const broadcasting = @import("core/broadcasting.zig");
 const creation = @import("core/creation.zig");
+const elementwise = @import("core/elementwise.zig");
 const NDArray = @import("core/ndarray.zig").NDArray;
 const shaper = @import("core/shape.zig");
 
@@ -110,4 +111,96 @@ export fn wasm_broadcast_shapes(a_ptr: usize, a_len: usize, b_ptr: usize, b_len:
     out[0] = @intFromPtr(res.ptr);
     out[1] = res.len;
     return 0;
+}
+
+fn callBinary(
+    comptime op: anytype,
+    a_ptr: usize,
+    a_data_len: usize,
+    a_shape_ptr: usize,
+    a_shape_len: usize,
+    b_ptr: usize,
+    b_data_len: usize,
+    b_shape_ptr: usize,
+    b_shape_len: usize,
+    out_ptr: usize,
+) i32 {
+    const a = arrayFromPtrs(a_ptr, a_data_len, a_shape_ptr, a_shape_len);
+    const b = arrayFromPtrs(b_ptr, b_data_len, b_shape_ptr, b_shape_len);
+    var res = op(wasm_allocator, &a, &b) catch return -1;
+    writeResult(&res, out_ptr);
+    return 0;
+}
+
+fn callUnary(
+    comptime op: anytype,
+    a_ptr: usize,
+    a_data_len: usize,
+    a_shape_ptr: usize,
+    a_shape_len: usize,
+    out_ptr: usize,
+) i32 {
+    const a = arrayFromPtrs(a_ptr, a_data_len, a_shape_ptr, a_shape_len);
+    var res = op(wasm_allocator, &a) catch return -1;
+    writeResult(&res, out_ptr);
+    return 0;
+}
+
+fn callScalar(
+    comptime op: anytype,
+    a_ptr: usize,
+    a_data_len: usize,
+    a_shape_ptr: usize,
+    a_shape_len: usize,
+    value: f64,
+    out_ptr: usize,
+) i32 {
+    const a = arrayFromPtrs(a_ptr, a_data_len, a_shape_ptr, a_shape_len);
+    var res = op(wasm_allocator, &a, value) catch return -1;
+    writeResult(&res, out_ptr);
+    return 0;
+}
+
+export fn wasm_add(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, b_ptr: usize, b_data_len: usize, b_shape_ptr: usize, b_shape_len: usize, out_ptr: usize) i32 {
+    return callBinary(elementwise.add, a_ptr, a_data_len, a_shape_ptr, a_shape_len, b_ptr, b_data_len, b_shape_ptr, b_shape_len, out_ptr);
+}
+
+export fn wasm_subtract(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, b_ptr: usize, b_data_len: usize, b_shape_ptr: usize, b_shape_len: usize, out_ptr: usize) i32 {
+    return callBinary(elementwise.subtract, a_ptr, a_data_len, a_shape_ptr, a_shape_len, b_ptr, b_data_len, b_shape_ptr, b_shape_len, out_ptr);
+}
+
+export fn wasm_multiply(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, b_ptr: usize, b_data_len: usize, b_shape_ptr: usize, b_shape_len: usize, out_ptr: usize) i32 {
+    return callBinary(elementwise.multiply, a_ptr, a_data_len, a_shape_ptr, a_shape_len, b_ptr, b_data_len, b_shape_ptr, b_shape_len, out_ptr);
+}
+
+export fn wasm_divide(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, b_ptr: usize, b_data_len: usize, b_shape_ptr: usize, b_shape_len: usize, out_ptr: usize) i32 {
+    return callBinary(elementwise.divide, a_ptr, a_data_len, a_shape_ptr, a_shape_len, b_ptr, b_data_len, b_shape_ptr, b_shape_len, out_ptr);
+}
+
+export fn wasm_negate(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, out_ptr: usize) i32 {
+    return callUnary(elementwise.negate, a_ptr, a_data_len, a_shape_ptr, a_shape_len, out_ptr);
+}
+
+export fn wasm_abs(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, out_ptr: usize) i32 {
+    return callUnary(elementwise.abs, a_ptr, a_data_len, a_shape_ptr, a_shape_len, out_ptr);
+}
+
+export fn wasm_sqrt(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, out_ptr: usize) i32 {
+    return callUnary(elementwise.sqrt, a_ptr, a_data_len, a_shape_ptr, a_shape_len, out_ptr);
+}
+
+export fn wasm_exp(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, out_ptr: usize) i32 {
+    return callUnary(elementwise.exp, a_ptr, a_data_len, a_shape_ptr, a_shape_len, out_ptr);
+}
+
+export fn wasm_log(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, out_ptr: usize) i32 {
+    return callUnary(elementwise.log, a_ptr, a_data_len, a_shape_ptr, a_shape_len, out_ptr);
+}
+
+export fn wasm_add_scalar(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, value: f64, out_ptr: usize) i32 {
+    return callScalar(elementwise.addScalar, a_ptr, a_data_len, a_shape_ptr, a_shape_len, value, out_ptr);
+}
+
+export fn wasm_mul_scalar(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, value: f64, out_ptr: usize) i32 {
+    return callScalar(elementwise.mulScalar, a_ptr, a_data_len, a_shape_ptr, a_shape_len, value, out_ptr);
 }

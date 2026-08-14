@@ -26,6 +26,17 @@ interface NumWasmExports {
   wasm_flatten(dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number, outPtr: number): number;
   wasm_squeeze(dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number, outPtr: number): number;
   wasm_broadcast_shapes(aPtr: number, aLen: number, bPtr: number, bLen: number, outPtr: number): number;
+  wasm_add(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number): number;
+  wasm_subtract(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number): number;
+  wasm_multiply(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number): number;
+  wasm_divide(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number): number;
+  wasm_negate(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, outPtr: number): number;
+  wasm_abs(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, outPtr: number): number;
+  wasm_sqrt(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, outPtr: number): number;
+  wasm_exp(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, outPtr: number): number;
+  wasm_log(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, outPtr: number): number;
+  wasm_add_scalar(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, value: number, outPtr: number): number;
+  wasm_mul_scalar(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, value: number, outPtr: number): number;
 }
 
 export class NumWasm {
@@ -77,13 +88,15 @@ export class NumWasm {
     const shapeLen = out[3];
     this._exports.wasm_free(outPtr, 4 * USIZE);
 
-    const data = Array.from(
-      new Float64Array(this._memory.buffer, dataPtr, dataLen),
-    );
-    this._exports.wasm_free(dataPtr, dataLen * F64);
+    const data = dataLen === 0
+      ? []
+      : Array.from(new Float64Array(this._memory.buffer, dataPtr, dataLen));
+    if (dataLen > 0) this._exports.wasm_free(dataPtr, dataLen * F64);
 
-    const shape = Array.from(new Uint32Array(this._memory.buffer, shapePtr, shapeLen));
-    this._exports.wasm_free(shapePtr, shapeLen * USIZE);
+    const shape = shapeLen === 0
+      ? []
+      : Array.from(new Uint32Array(this._memory.buffer, shapePtr, shapeLen));
+    if (shapeLen > 0) this._exports.wasm_free(shapePtr, shapeLen * USIZE);
 
     return { data, shape };
   }
@@ -118,6 +131,54 @@ export class NumWasm {
     const input = this._writeArray(arr);
     const outPtr = this._allocOut();
     const rc = wasmFn(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, ...extraArgs, outPtr);
+    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
+    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
+    return this._readResult(outPtr);
+  }
+
+  private _callBinary(
+    wasmFn: (aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number) => number,
+    a: NdArray,
+    b: NdArray,
+  ): NdArray {
+    const ia = this._writeArray(a);
+    const ib = this._writeArray(b);
+    const outPtr = this._allocOut();
+    const rc = wasmFn(
+      ia.dataPtr, a.data.length, ia.shapePtr, ia.shapeLen,
+      ib.dataPtr, b.data.length, ib.shapePtr, ib.shapeLen,
+      outPtr,
+    );
+    this._exports.wasm_free(ia.dataPtr, a.data.length * F64);
+    this._exports.wasm_free(ia.shapePtr, a.shape.length * USIZE);
+    this._exports.wasm_free(ib.dataPtr, b.data.length * F64);
+    this._exports.wasm_free(ib.shapePtr, b.shape.length * USIZE);
+    if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
+    return this._readResult(outPtr);
+  }
+
+  private _callUnary(
+    wasmFn: (aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, outPtr: number) => number,
+    arr: NdArray,
+  ): NdArray {
+    const input = this._writeArray(arr);
+    const outPtr = this._allocOut();
+    const rc = wasmFn(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, outPtr);
+    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
+    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
+    return this._readResult(outPtr);
+  }
+
+  private _callScalar(
+    wasmFn: (aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, value: number, outPtr: number) => number,
+    arr: NdArray,
+    value: number,
+  ): NdArray {
+    const input = this._writeArray(arr);
+    const outPtr = this._allocOut();
+    const rc = wasmFn(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, value, outPtr);
     this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
     this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
     if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
@@ -182,5 +243,49 @@ export class NumWasm {
     if (sb.byteLen > 0) this._exports.wasm_free(sb.ptr, sb.byteLen);
     if (rc !== 0) throw new Error(`broadcast_shapes failed (rc=${rc})`);
     return this._readUsizeArray(outPtr);
+  }
+
+  add(a: NdArray, b: NdArray): NdArray {
+    return this._callBinary(this._exports.wasm_add, a, b);
+  }
+
+  subtract(a: NdArray, b: NdArray): NdArray {
+    return this._callBinary(this._exports.wasm_subtract, a, b);
+  }
+
+  multiply(a: NdArray, b: NdArray): NdArray {
+    return this._callBinary(this._exports.wasm_multiply, a, b);
+  }
+
+  divide(a: NdArray, b: NdArray): NdArray {
+    return this._callBinary(this._exports.wasm_divide, a, b);
+  }
+
+  negate(a: NdArray): NdArray {
+    return this._callUnary(this._exports.wasm_negate, a);
+  }
+
+  abs(a: NdArray): NdArray {
+    return this._callUnary(this._exports.wasm_abs, a);
+  }
+
+  sqrt(a: NdArray): NdArray {
+    return this._callUnary(this._exports.wasm_sqrt, a);
+  }
+
+  exp(a: NdArray): NdArray {
+    return this._callUnary(this._exports.wasm_exp, a);
+  }
+
+  log(a: NdArray): NdArray {
+    return this._callUnary(this._exports.wasm_log, a);
+  }
+
+  addScalar(a: NdArray, value: number): NdArray {
+    return this._callScalar(this._exports.wasm_add_scalar, a, value);
+  }
+
+  mulScalar(a: NdArray, value: number): NdArray {
+    return this._callScalar(this._exports.wasm_mul_scalar, a, value);
   }
 }
