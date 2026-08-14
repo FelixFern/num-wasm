@@ -137,12 +137,12 @@ General formula: `flat = Σ(indices[d] * product(shape[d+1..]))`
 
 **Goal**: Extract sub-arrays. All operations return copies (no views in simplified approach).
 
-- [ ] **8.1** `slice(self, allocator, dim, start, stop, step) → NDArray` — compute output shape, iterate and copy matching elements
-- [ ] **8.2** Multi-dim slicing: chain single-dim slices
-- [ ] **8.3** `indexAxis(self, allocator, dim, i) → NDArray` — select one position along dim, reduce ndim by 1
-- [ ] **8.4** Boolean masking `where(self, allocator, mask) → NDArray` — copy elements where mask is non-zero
-- [ ] **8.5** Negative indexing: `shape[dim] + index` for negative values
-- [ ] **8.6** Tests: slice `(4, 5)` array, verify correct elements. Negative index. Boolean mask
+- [X] **8.1** `slice(self, allocator, dim, start, stop, step) → NDArray` — compute output shape, iterate and copy matching elements
+- [X] **8.2** Multi-dim slicing: chain single-dim slices
+- [X] **8.3** `indexAxis(self, allocator, dim, i) → NDArray` — select one position along dim, reduce ndim by 1
+- [X] **8.4** Boolean masking `where(self, allocator, mask) → NDArray` — copy elements where mask is non-zero
+- [X] **8.5** Negative indexing: `shape[dim] + index` for negative values
+- [X] **8.6** Tests: slice `(4, 5)` array, verify correct elements. Negative index. Boolean mask
 
 ---
 
