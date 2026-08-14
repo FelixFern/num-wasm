@@ -111,12 +111,12 @@ General formula: `flat = Σ(indices[d] * product(shape[d+1..]))`
 
 **Goal**: `add(a, b)`, `sqrt(a)`, etc. — using broadcasting.
 
-- [ ] **6.1** Implement `binaryOp(allocator, a, b, comptime op_fn) → NDArray` — broadcast shapes, allocate output, iterate all indices in output, use `broadcastIndex` to get values from a and b, apply op
-- [ ] **6.2** Wire up: `add`, `subtract`, `multiply`, `divide`
-- [ ] **6.3** Implement `unaryOp(allocator, a, comptime op_fn) → NDArray` — allocate output with same shape, apply op to each element
-- [ ] **6.4** Wire up: `negate`, `abs`, `sqrt`, `exp`, `log` — use `@sqrt`, `@exp`, `@log` builtins and `std.math`
-- [ ] **6.5** Scalar-array ops: `addScalar`, `mulScalar` — simpler fast path, no broadcasting needed
-- [ ] **6.6** Export key ops via WASM, test from Node.js
+- [X] **6.1** Implement `binaryOp(allocator, a, b, comptime op_fn) → NDArray` — broadcast shapes, allocate output, iterate all indices in output, use `broadcastIndex` to get values from a and b, apply op
+- [X] **6.2** Wire up: `add`, `subtract`, `multiply`, `divide`
+- [X] **6.3** Implement `unaryOp(allocator, a, comptime op_fn) → NDArray` — allocate output with same shape, apply op to each element
+- [X] **6.4** Wire up: `negate`, `abs`, `sqrt`, `exp`, `log` — use `@sqrt`, `@exp`, `@log` builtins and `std.math`
+- [X] **6.5** Scalar-array ops: `addScalar`, `mulScalar` — simpler fast path, no broadcasting needed
+- [X] **6.6** Export key ops via WASM, test from Node.js
 
 ---
 
