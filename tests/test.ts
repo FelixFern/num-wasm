@@ -328,6 +328,49 @@ async function main(): Promise<void> {
     assert.throws(() => nw.where(a, [1]));
   });
 
+  console.log("\nnw.dot:");
+  test("nw.dot([1,2,3], [4,5,6]) → 32", () => {
+    const a = nw.arange(1, 4, 1);
+    const b = nw.arange(4, 7, 1);
+    assert.equal(nw.dot(a, b), 32);
+  });
+
+  test("nw.dot length mismatch throws", () => {
+    assert.throws(() => nw.dot(nw.arange(0, 3, 1), nw.arange(0, 4, 1)));
+  });
+
+  console.log("\nnw.matmul:");
+  test("nw.matmul((2,3) × (3,2)) → (2,2)", () => {
+    const a = nw.reshape(nw.arange(0, 6, 1), [2, 3]); // [[0,1,2],[3,4,5]]
+    const b = nw.reshape(nw.arange(0, 6, 1), [3, 2]); // [[0,1],[2,3],[4,5]]
+    const r = nw.matmul(a, b);
+    assert.deepEqual(r.shape, [2, 2]);
+    assert.deepEqual(r.data, [10, 13, 28, 40]);
+  });
+
+  test("nw.matmul identity preserves", () => {
+    const a = nw.reshape(nw.arange(1, 7, 1), [2, 3]); // 1..6
+    const ident = nw.zeros([3, 3]);
+    ident.data[0] = 1;
+    ident.data[4] = 1;
+    ident.data[8] = 1;
+    const r = nw.matmul(a, ident);
+    assert.deepEqual(r.data, a.data);
+  });
+
+  test("nw.matmul incompatible throws", () => {
+    assert.throws(() => nw.matmul(nw.full([2, 3], 1), nw.full([2, 2], 1)));
+  });
+
+  console.log("\nnw.outer:");
+  test("nw.outer([1,2], [3,4,5]) → (2,3)", () => {
+    const a = nw.arange(1, 3, 1);
+    const b = nw.arange(3, 6, 1);
+    const r = nw.outer(a, b);
+    assert.deepEqual(r.shape, [2, 3]);
+    assert.deepEqual(r.data, [3, 4, 5, 6, 8, 10]);
+  });
+
   console.log(`\n${"─".repeat(40)}`);
   console.log(`${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);

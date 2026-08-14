@@ -150,10 +150,10 @@ General formula: `flat = Σ(indices[d] * product(shape[d+1..]))`
 
 **Goal**: Dot product, matrix multiply.
 
-- [ ] **9.1** `dot(a, b) → f64` — 1D only, `Σ(a.data[i] * b.data[i])`
-- [ ] **9.2** `matmul(allocator, a, b) → NDArray` — 2D, `(m,k) × (k,n) → (m,n)`, naive triple loop
-- [ ] **9.3** `outer(allocator, a, b) → NDArray` — `result[i*n + j] = a[i] * b[j]`
-- [ ] **9.4** Tests: dot product, 2×3 times 3×2 matmul, outer product
+- [X] **9.1** `dot(a, b) → f64` — 1D only, `Σ(a.data[i] * b.data[i])`
+- [X] **9.2** `matmul(allocator, a, b) → NDArray` — 2D, `(m,k) × (k,n) → (m,n)`, naive triple loop
+- [X] **9.3** `outer(allocator, a, b) → NDArray` — `result[i*n + j] = a[i] * b[j]`
+- [X] **9.4** Tests: dot product, 2×3 times 3×2 matmul, outer product
 
 ---
 
