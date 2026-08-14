@@ -5,11 +5,6 @@ const WASM_PATH = path.join(__dirname, "../zig-out/bin/num-wasm.wasm");
 const USIZE = 4;
 const F64 = 8;
 
-interface NdArray {
-  data: number[];
-  shape: number[];
-}
-
 interface NumWasmExports {
   memory: WebAssembly.Memory;
   wasm_alloc(len: number): number;
@@ -57,6 +52,90 @@ interface NumWasmExports {
   wasm_outer(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number): number;
 }
 
+type ReduceAllFn = (dataPtr: number, dataLen: number) => number;
+type ReduceAxisFn = (aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number) => number;
+
+function isNumberArray(value: unknown): value is number[] {
+  return Array.isArray(value) && value.every((v) => typeof v === "number");
+}
+
+function inferShape(value: unknown): number[] {
+  const shape: number[] = [];
+  let current = value;
+  while (Array.isArray(current)) {
+    shape.push(current.length);
+    if (current.length === 0) break;
+    current = current[0];
+  }
+  return shape;
+}
+
+function flattenRec(value: unknown, acc: number[]): void {
+  if (Array.isArray(value)) {
+    for (const v of value) flattenRec(v, acc);
+  } else if (typeof value === "number") {
+    acc.push(value);
+  } else {
+    throw new Error("array elements must be numbers");
+  }
+}
+
+interface NdArrayHeld {
+  nw: NumWasm;
+  dataPtr: number;
+  dataLen: number;
+  shapePtr: number;
+  shapeLen: number;
+  freed: boolean;
+}
+
+export class NdArray {
+  private _nw: NumWasm;
+  _held: NdArrayHeld;
+  private _shapeCache: number[] | null = null;
+  private static _finalizer = new FinalizationRegistry<NdArrayHeld>((held) => {
+    if (!held.freed) {
+      console.warn("NdArray was garbage collected without calling .free() — freeing memory automatically");
+      held.nw._freeHeld(held);
+    }
+  });
+
+  constructor(nw: NumWasm, dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number) {
+    this._nw = nw;
+    this._held = { nw, dataPtr, dataLen, shapePtr, shapeLen, freed: false };
+    NdArray._finalizer.register(this, this._held);
+  }
+
+  get shape(): number[] {
+    if (this._shapeCache === null) {
+      this._shapeCache = this._held.shapeLen === 0
+        ? []
+        : Array.from(new Uint32Array(this._nw.memory.buffer, this._held.shapePtr, this._held.shapeLen));
+    }
+    return this._shapeCache;
+  }
+
+  get data(): number[] {
+    return this.toArray();
+  }
+
+  toArray(): number[] {
+    if (this._held.dataLen === 0) return [];
+    return Array.from(new Float64Array(this._nw.memory.buffer, this._held.dataPtr, this._held.dataLen));
+  }
+
+  toTypedArray(): Float64Array {
+    if (this._held.dataLen === 0) return new Float64Array(0);
+    return new Float64Array(this._nw.memory.buffer, this._held.dataPtr, this._held.dataLen).slice();
+  }
+
+  free(): void {
+    if (!this._held.freed) {
+      this._nw._freeHeld(this._held);
+    }
+  }
+}
+
 export class NumWasm {
   private _exports: NumWasmExports;
   private _memory: WebAssembly.Memory;
@@ -66,10 +145,21 @@ export class NumWasm {
     this._memory = (instance.exports as unknown as NumWasmExports).memory;
   }
 
+  get memory(): WebAssembly.Memory {
+    return this._memory;
+  }
+
   static async init(): Promise<NumWasm> {
     const wasmBuffer = fs.readFileSync(WASM_PATH);
     const { instance } = await WebAssembly.instantiate(wasmBuffer);
     return new NumWasm(instance);
+  }
+
+  _freeHeld(held: NdArrayHeld): void {
+    if (held.freed) return;
+    held.freed = true;
+    if (held.dataLen > 0) this._exports.wasm_free(held.dataPtr, held.dataLen * F64);
+    if (held.shapeLen > 0) this._exports.wasm_free(held.shapePtr, held.shapeLen * USIZE);
   }
 
   private _writeShape(shape: number[]): { ptr: number; byteLen: number } {
@@ -93,30 +183,19 @@ export class NumWasm {
     const len = out[1];
     this._exports.wasm_free(outPtr, 2 * USIZE);
 
-    const values = Array.from(new Uint32Array(this._memory.buffer, ptr, len));
-    this._exports.wasm_free(ptr, len * USIZE);
+    const values = len === 0 ? [] : Array.from(new Uint32Array(this._memory.buffer, ptr, len));
+    if (len > 0) this._exports.wasm_free(ptr, len * USIZE);
     return values;
   }
 
-  private _readResult(outPtr: number): NdArray {
+  private _parseResult(outPtr: number): NdArray {
     const out = new Uint32Array(this._memory.buffer, outPtr, 4);
     const dataPtr = out[0];
     const dataLen = out[1];
     const shapePtr = out[2];
     const shapeLen = out[3];
     this._exports.wasm_free(outPtr, 4 * USIZE);
-
-    const data = dataLen === 0
-      ? []
-      : Array.from(new Float64Array(this._memory.buffer, dataPtr, dataLen));
-    if (dataLen > 0) this._exports.wasm_free(dataPtr, dataLen * F64);
-
-    const shape = shapeLen === 0
-      ? []
-      : Array.from(new Uint32Array(this._memory.buffer, shapePtr, shapeLen));
-    if (shapeLen > 0) this._exports.wasm_free(shapePtr, shapeLen * USIZE);
-
-    return { data, shape };
+    return new NdArray(this, dataPtr, dataLen, shapePtr, shapeLen);
   }
 
   private _callWithShape(
@@ -127,18 +206,9 @@ export class NumWasm {
     const s = this._writeShape(shape);
     const outPtr = this._allocOut();
     const rc = wasmFn(s.ptr, shape.length, ...extraArgs, outPtr);
-    this._exports.wasm_free(s.ptr, s.byteLen);
+    if (s.byteLen > 0) this._exports.wasm_free(s.ptr, s.byteLen);
     if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
-    return this._readResult(outPtr);
-  }
-
-  private _writeArray(arr: NdArray): { dataPtr: number; shapePtr: number; shapeLen: number } {
-    const dataPtr = this._exports.wasm_alloc(arr.data.length * F64);
-    if (dataPtr === 0) throw new Error("alloc failed for data");
-    new Float64Array(this._memory.buffer, dataPtr, arr.data.length).set(arr.data);
-
-    const s = this._writeShape(arr.shape);
-    return { dataPtr, shapePtr: s.ptr, shapeLen: arr.shape.length };
+    return this._parseResult(outPtr);
   }
 
   private _callOnArray(
@@ -146,13 +216,10 @@ export class NumWasm {
     arr: NdArray,
     ...extraArgs: number[]
   ): NdArray {
-    const input = this._writeArray(arr);
     const outPtr = this._allocOut();
-    const rc = wasmFn(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, ...extraArgs, outPtr);
-    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
-    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    const rc = wasmFn(arr._held.dataPtr, arr._held.dataLen, arr._held.shapePtr, arr._held.shapeLen, ...extraArgs, outPtr);
     if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
-    return this._readResult(outPtr);
+    return this._parseResult(outPtr);
   }
 
   private _callBinary(
@@ -160,33 +227,20 @@ export class NumWasm {
     a: NdArray,
     b: NdArray,
   ): NdArray {
-    const ia = this._writeArray(a);
-    const ib = this._writeArray(b);
     const outPtr = this._allocOut();
-    const rc = wasmFn(
-      ia.dataPtr, a.data.length, ia.shapePtr, ia.shapeLen,
-      ib.dataPtr, b.data.length, ib.shapePtr, ib.shapeLen,
-      outPtr,
-    );
-    this._exports.wasm_free(ia.dataPtr, a.data.length * F64);
-    this._exports.wasm_free(ia.shapePtr, a.shape.length * USIZE);
-    this._exports.wasm_free(ib.dataPtr, b.data.length * F64);
-    this._exports.wasm_free(ib.shapePtr, b.shape.length * USIZE);
+    const rc = wasmFn(a._held.dataPtr, a._held.dataLen, a._held.shapePtr, a._held.shapeLen, b._held.dataPtr, b._held.dataLen, b._held.shapePtr, b._held.shapeLen, outPtr);
     if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
-    return this._readResult(outPtr);
+    return this._parseResult(outPtr);
   }
 
   private _callUnary(
     wasmFn: (aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, outPtr: number) => number,
     arr: NdArray,
   ): NdArray {
-    const input = this._writeArray(arr);
     const outPtr = this._allocOut();
-    const rc = wasmFn(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, outPtr);
-    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
-    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    const rc = wasmFn(arr._held.dataPtr, arr._held.dataLen, arr._held.shapePtr, arr._held.shapeLen, outPtr);
     if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
-    return this._readResult(outPtr);
+    return this._parseResult(outPtr);
   }
 
   private _callScalar(
@@ -194,13 +248,35 @@ export class NumWasm {
     arr: NdArray,
     value: number,
   ): NdArray {
-    const input = this._writeArray(arr);
     const outPtr = this._allocOut();
-    const rc = wasmFn(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, value, outPtr);
-    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
-    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    const rc = wasmFn(arr._held.dataPtr, arr._held.dataLen, arr._held.shapePtr, arr._held.shapeLen, value, outPtr);
     if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
-    return this._readResult(outPtr);
+    return this._parseResult(outPtr);
+  }
+
+  private _reduceAll(wasmFn: ReduceAllFn, arr: NdArray): number {
+    return wasmFn(arr._held.dataPtr, arr._held.dataLen);
+  }
+
+  private _reduceAxis(wasmFn: ReduceAxisFn, arr: NdArray, axis: number): NdArray {
+    const outPtr = this._allocOut();
+    const rc = wasmFn(arr._held.dataPtr, arr._held.dataLen, arr._held.shapePtr, arr._held.shapeLen, axis, outPtr);
+    if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
+    return this._parseResult(outPtr);
+  }
+
+  array(jsData: number[] | number[][] | number[][][]): NdArray {
+    const flat: number[] = [];
+    flattenRec(jsData, flat);
+    const shape = inferShape(jsData);
+
+    const dataLen = flat.length;
+    const dataPtr = dataLen === 0 ? 0 : this._exports.wasm_alloc(dataLen * F64);
+    if (dataLen > 0 && dataPtr === 0) throw new Error("alloc failed for data");
+    if (dataLen > 0) new Float64Array(this._memory.buffer, dataPtr, dataLen).set(flat);
+
+    const s = this._writeShape(shape);
+    return new NdArray(this, dataPtr, dataLen, s.ptr, shape.length);
   }
 
   zeros(shape: number[]): NdArray {
@@ -219,14 +295,14 @@ export class NumWasm {
     const outPtr = this._allocOut();
     const rc = this._exports.wasm_arange(start, stop, step, outPtr);
     if (rc !== 0) throw new Error(`arange failed (rc=${rc})`);
-    return this._readResult(outPtr);
+    return this._parseResult(outPtr);
   }
 
   linspace(start: number, stop: number, count: number): NdArray {
     const outPtr = this._allocOut();
     const rc = this._exports.wasm_linspace(start, stop, count, outPtr);
     if (rc !== 0) throw new Error(`linspace failed (rc=${rc})`);
-    return this._readResult(outPtr);
+    return this._parseResult(outPtr);
   }
 
   reshape(arr: NdArray, newShape: number[]): NdArray {
@@ -235,7 +311,7 @@ export class NumWasm {
       (d, dl, s, l, out) => this._exports.wasm_reshape(d, dl, s, l, ns.ptr, newShape.length, out),
       arr,
     );
-    this._exports.wasm_free(ns.ptr, ns.byteLen);
+    if (ns.byteLen > 0) this._exports.wasm_free(ns.ptr, ns.byteLen);
     return res;
   }
 
@@ -307,31 +383,6 @@ export class NumWasm {
     return this._callScalar(this._exports.wasm_mul_scalar, a, value);
   }
 
-  private _reduceAll(
-    wasmFn: (dataPtr: number, dataLen: number) => number,
-    arr: NdArray,
-  ): number {
-    const input = this._writeArray(arr);
-    const result = wasmFn(input.dataPtr, arr.data.length);
-    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
-    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
-    return result;
-  }
-
-  private _reduceAxis(
-    wasmFn: (aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number) => number,
-    arr: NdArray,
-    axis: number,
-  ): NdArray {
-    const input = this._writeArray(arr);
-    const outPtr = this._allocOut();
-    const rc = wasmFn(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, axis, outPtr);
-    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
-    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
-    if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
-    return this._readResult(outPtr);
-  }
-
   sum(a: NdArray, opts?: { axis?: number }): number | NdArray {
     if (opts?.axis !== undefined) return this._reduceAxis(this._exports.wasm_sum_axis, a, opts.axis);
     return this._reduceAll(this._exports.wasm_sum, a);
@@ -366,51 +417,36 @@ export class NumWasm {
   }
 
   slice(arr: NdArray, dim: number, start: number, stop: number, step = 1): NdArray {
-    const input = this._writeArray(arr);
     const outPtr = this._allocOut();
-    const rc = this._exports.wasm_slice(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, dim, start, stop, step, outPtr);
-    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
-    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    const rc = this._exports.wasm_slice(arr._held.dataPtr, arr._held.dataLen, arr._held.shapePtr, arr._held.shapeLen, dim, start, stop, step, outPtr);
     if (rc !== 0) throw new Error(`slice failed (rc=${rc})`);
-    return this._readResult(outPtr);
+    return this._parseResult(outPtr);
   }
 
   indexAxis(arr: NdArray, dim: number, index: number): NdArray {
-    const input = this._writeArray(arr);
     const outPtr = this._allocOut();
-    const rc = this._exports.wasm_index_axis(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, dim, index, outPtr);
-    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
-    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    const rc = this._exports.wasm_index_axis(arr._held.dataPtr, arr._held.dataLen, arr._held.shapePtr, arr._held.shapeLen, dim, index, outPtr);
     if (rc !== 0) throw new Error(`indexAxis failed (rc=${rc})`);
-    return this._readResult(outPtr);
+    return this._parseResult(outPtr);
   }
 
   where(arr: NdArray, mask: number[]): NdArray {
-    const input = this._writeArray(arr);
-    if (mask.length !== arr.data.length) throw new Error("mask length mismatch");
-    const maskPtr = this._exports.wasm_alloc(mask.length * F64);
-    if (maskPtr === 0) throw new Error("alloc failed for mask");
-    new Float64Array(this._memory.buffer, maskPtr, mask.length).set(mask);
+    if (!isNumberArray(mask)) throw new Error("mask must be a number array");
+    if (mask.length !== arr._held.dataLen) throw new Error("mask length mismatch");
+    const maskPtr = mask.length === 0 ? 0 : this._exports.wasm_alloc(mask.length * F64);
+    if (mask.length > 0 && maskPtr === 0) throw new Error("alloc failed for mask");
+    if (mask.length > 0) new Float64Array(this._memory.buffer, maskPtr, mask.length).set(mask);
     const outPtr = this._allocOut();
-    const rc = this._exports.wasm_where(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, maskPtr, mask.length, outPtr);
-    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
-    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
-    this._exports.wasm_free(maskPtr, mask.length * F64);
+    const rc = this._exports.wasm_where(arr._held.dataPtr, arr._held.dataLen, arr._held.shapePtr, arr._held.shapeLen, maskPtr, mask.length, outPtr);
+    if (mask.length > 0) this._exports.wasm_free(maskPtr, mask.length * F64);
     if (rc !== 0) throw new Error(`where failed (rc=${rc})`);
-    return this._readResult(outPtr);
+    return this._parseResult(outPtr);
   }
 
   dot(a: NdArray, b: NdArray): number {
     if (a.shape.length !== 1 || b.shape.length !== 1) throw new Error("dot requires 1D arrays");
-    if (a.data.length !== b.data.length) throw new Error("dot requires equal lengths");
-    const ia = this._writeArray(a);
-    const ib = this._writeArray(b);
-    const result = this._exports.wasm_dot(ia.dataPtr, a.data.length, ia.shapePtr, ia.shapeLen, ib.dataPtr, b.data.length, ib.shapePtr, ib.shapeLen);
-    this._exports.wasm_free(ia.dataPtr, a.data.length * F64);
-    this._exports.wasm_free(ia.shapePtr, a.shape.length * USIZE);
-    this._exports.wasm_free(ib.dataPtr, b.data.length * F64);
-    this._exports.wasm_free(ib.shapePtr, b.shape.length * USIZE);
-    return result;
+    if (a._held.dataLen !== b._held.dataLen) throw new Error("dot requires equal lengths");
+    return this._exports.wasm_dot(a._held.dataPtr, a._held.dataLen, a._held.shapePtr, a._held.shapeLen, b._held.dataPtr, b._held.dataLen, b._held.shapePtr, b._held.shapeLen);
   }
 
   matmul(a: NdArray, b: NdArray): NdArray {
