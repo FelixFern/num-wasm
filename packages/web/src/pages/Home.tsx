@@ -12,10 +12,10 @@ const installCommands = [
 
 const demos = [
   {
-    title: "MNIST MLP",
-    desc: "Train a 2-layer ReLU network on MNIST digits live in the browser — forward pass and backprop running on the Zig WASM kernel.",
+    title: "Handwritten digit demo",
+    desc: "Train an MLP on MNIST live in the browser and read back drawn digits — forward pass and backprop running on the Zig WASM kernel.",
     logo: "./demo-mnist.svg",
-    href: "",
+    href: "https://num-wasm-demo.vercel.app",
   },
 ];
 

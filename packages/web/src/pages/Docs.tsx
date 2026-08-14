@@ -5,11 +5,11 @@ function Docs() {
   return (
     <div className="max-w-4xl px-6 py-12 mx-auto lg:flex lg:gap-12">
       <nav className="hidden w-52 lg:block shrink-0">
-        <div className="sticky top-8">
+        <div className="sticky top-8 max-h-[calc(100vh-4rem)] overflow-y-auto pr-1">
           <span className="text-xs font-semibold tracking-wider uppercase text-zinc-500">
             API Reference
           </span>
-          <ul className="mt-3 space-y-1 border-l border-zinc-800">
+          <ul className="mt-3 space-y-1 border-l border-zinc-800 pb-6">
             <li>
               <NavLink
                 to="/docs"

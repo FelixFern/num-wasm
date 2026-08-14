@@ -33,20 +33,6 @@ export interface ApiGroup {
   methods: ApiMethod[];
 }
 
-export type MethodRoute = {
-  groupId: string;
-  groupTitle: string;
-  method: ApiMethod;
-};
-
-export const methodRoutes: MethodRoute[] = Object.entries(apiGroups).flatMap(
-  ([groupId, group]) =>
-    group.methods.map((method) => ({ groupId, groupTitle: group.title, method })),
-);
-
-export const methodRouteFor = (name: string): MethodRoute | undefined =>
-  methodRoutes.find((r) => r.method.name === name);
-
 export const apiGroups: Record<string, ApiGroup> = {
   creation: {
     title: "Array creation",
@@ -689,6 +675,20 @@ export const apiGroups: Record<string, ApiGroup> = {
     ],
   },
 };
+
+export type MethodRoute = {
+  groupId: string;
+  groupTitle: string;
+  method: ApiMethod;
+};
+
+export const methodRoutes: MethodRoute[] = Object.entries(apiGroups).flatMap(
+  ([groupId, group]) =>
+    group.methods.map((method) => ({ groupId, groupTitle: group.title, method })),
+);
+
+export const methodRouteFor = (name: string): MethodRoute | undefined =>
+  methodRoutes.find((r) => r.method.name === name);
 
 export const code = {
   install: `# Node >= 18 — Node, bundlers, and browsers

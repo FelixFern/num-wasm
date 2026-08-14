@@ -19,12 +19,12 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -40,22 +40,26 @@ jobs:
             exit 1
           fi
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Node 24
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           registry-url: https://registry.npmjs.org/
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+      - name: Install pnpm
+        run: npm install -g pnpm@11
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Setup Zig
-        uses: mlugg/setup-zig@v1
+        run: |
+          ZIG_VERSION=0.15.2
+          curl -fsSL "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz" -o /tmp/zig.tar.xz
+          mkdir -p /tmp/zig
+          tar -xJf /tmp/zig.tar.xz -C /tmp/zig --strip-components=1
+          /tmp/zig/zig version
+          echo "/tmp/zig" >> "$GITHUB_PATH"
 
       - name: Build WASM
         working-directory: packages/core
