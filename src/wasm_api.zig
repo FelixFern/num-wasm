@@ -5,6 +5,7 @@ const broadcasting = @import("core/broadcasting.zig");
 const creation = @import("core/creation.zig");
 const elementwise = @import("core/elementwise.zig");
 const NDArray = @import("core/ndarray.zig").NDArray;
+const reduce = @import("core/reduce.zig");
 const shaper = @import("core/shape.zig");
 
 export fn wasm_alloc(len: usize) usize {
@@ -203,4 +204,95 @@ export fn wasm_add_scalar(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a
 
 export fn wasm_mul_scalar(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, value: f64, out_ptr: usize) i32 {
     return callScalar(elementwise.mulScalar, a_ptr, a_data_len, a_shape_ptr, a_shape_len, value, out_ptr);
+}
+
+fn callReduceAxis(
+    comptime op: anytype,
+    a_ptr: usize,
+    a_data_len: usize,
+    a_shape_ptr: usize,
+    a_shape_len: usize,
+    axis: usize,
+    out_ptr: usize,
+) i32 {
+    const a = arrayFromPtrs(a_ptr, a_data_len, a_shape_ptr, a_shape_len);
+    var res = op(wasm_allocator, &a, axis) catch return -1;
+    writeResult(&res, out_ptr);
+    return 0;
+}
+
+fn dataSlice(data_ptr: usize, data_len: usize) []const f64 {
+    const start: [*]const f64 = @ptrFromInt(data_ptr);
+    return start[0..data_len];
+}
+
+export fn wasm_sum(data_ptr: usize, data_len: usize) f64 {
+    const data = dataSlice(data_ptr, data_len);
+    var acc: f64 = 0.0;
+    for (data) |v| acc += v;
+    return acc;
+}
+
+export fn wasm_mean(data_ptr: usize, data_len: usize) f64 {
+    if (data_len == 0) return std.math.nan(f64);
+    return wasm_sum(data_ptr, data_len) / @as(f64, @floatFromInt(data_len));
+}
+
+export fn wasm_max(data_ptr: usize, data_len: usize) f64 {
+    const data = dataSlice(data_ptr, data_len);
+    var acc = -std.math.inf(f64);
+    for (data) |v| acc = @max(acc, v);
+    return acc;
+}
+
+export fn wasm_min(data_ptr: usize, data_len: usize) f64 {
+    const data = dataSlice(data_ptr, data_len);
+    var acc = std.math.inf(f64);
+    for (data) |v| acc = @min(acc, v);
+    return acc;
+}
+
+export fn wasm_prod(data_ptr: usize, data_len: usize) f64 {
+    const data = dataSlice(data_ptr, data_len);
+    var acc: f64 = 1.0;
+    for (data) |v| acc *= v;
+    return acc;
+}
+
+export fn wasm_argmax(data_ptr: usize, data_len: usize) usize {
+    const data = dataSlice(data_ptr, data_len);
+    var best: usize = 0;
+    for (data, 0..) |v, i| {
+        if (v > data[best]) best = i;
+    }
+    return best;
+}
+
+export fn wasm_argmin(data_ptr: usize, data_len: usize) usize {
+    const data = dataSlice(data_ptr, data_len);
+    var best: usize = 0;
+    for (data, 0..) |v, i| {
+        if (v < data[best]) best = i;
+    }
+    return best;
+}
+
+export fn wasm_sum_axis(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, axis: usize, out_ptr: usize) i32 {
+    return callReduceAxis(reduce.sumAxis, a_ptr, a_data_len, a_shape_ptr, a_shape_len, axis, out_ptr);
+}
+
+export fn wasm_mean_axis(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, axis: usize, out_ptr: usize) i32 {
+    return callReduceAxis(reduce.meanAxis, a_ptr, a_data_len, a_shape_ptr, a_shape_len, axis, out_ptr);
+}
+
+export fn wasm_max_axis(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, axis: usize, out_ptr: usize) i32 {
+    return callReduceAxis(reduce.maxAxis, a_ptr, a_data_len, a_shape_ptr, a_shape_len, axis, out_ptr);
+}
+
+export fn wasm_min_axis(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, axis: usize, out_ptr: usize) i32 {
+    return callReduceAxis(reduce.minAxis, a_ptr, a_data_len, a_shape_ptr, a_shape_len, axis, out_ptr);
+}
+
+export fn wasm_prod_axis(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, axis: usize, out_ptr: usize) i32 {
+    return callReduceAxis(reduce.prodAxis, a_ptr, a_data_len, a_shape_ptr, a_shape_len, axis, out_ptr);
 }

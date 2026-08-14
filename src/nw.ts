@@ -37,6 +37,18 @@ interface NumWasmExports {
   wasm_log(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, outPtr: number): number;
   wasm_add_scalar(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, value: number, outPtr: number): number;
   wasm_mul_scalar(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, value: number, outPtr: number): number;
+  wasm_sum(dataPtr: number, dataLen: number): number;
+  wasm_mean(dataPtr: number, dataLen: number): number;
+  wasm_max(dataPtr: number, dataLen: number): number;
+  wasm_min(dataPtr: number, dataLen: number): number;
+  wasm_prod(dataPtr: number, dataLen: number): number;
+  wasm_argmax(dataPtr: number, dataLen: number): number;
+  wasm_argmin(dataPtr: number, dataLen: number): number;
+  wasm_sum_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
+  wasm_mean_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
+  wasm_max_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
+  wasm_min_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
+  wasm_prod_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
 }
 
 export class NumWasm {
@@ -287,5 +299,63 @@ export class NumWasm {
 
   mulScalar(a: NdArray, value: number): NdArray {
     return this._callScalar(this._exports.wasm_mul_scalar, a, value);
+  }
+
+  private _reduceAll(
+    wasmFn: (dataPtr: number, dataLen: number) => number,
+    arr: NdArray,
+  ): number {
+    const input = this._writeArray(arr);
+    const result = wasmFn(input.dataPtr, arr.data.length);
+    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
+    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    return result;
+  }
+
+  private _reduceAxis(
+    wasmFn: (aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number) => number,
+    arr: NdArray,
+    axis: number,
+  ): NdArray {
+    const input = this._writeArray(arr);
+    const outPtr = this._allocOut();
+    const rc = wasmFn(input.dataPtr, arr.data.length, input.shapePtr, input.shapeLen, axis, outPtr);
+    this._exports.wasm_free(input.dataPtr, arr.data.length * F64);
+    this._exports.wasm_free(input.shapePtr, arr.shape.length * USIZE);
+    if (rc !== 0) throw new Error(`WASM call failed (rc=${rc})`);
+    return this._readResult(outPtr);
+  }
+
+  sum(a: NdArray, opts?: { axis?: number }): number | NdArray {
+    if (opts?.axis !== undefined) return this._reduceAxis(this._exports.wasm_sum_axis, a, opts.axis);
+    return this._reduceAll(this._exports.wasm_sum, a);
+  }
+
+  mean(a: NdArray, opts?: { axis?: number }): number | NdArray {
+    if (opts?.axis !== undefined) return this._reduceAxis(this._exports.wasm_mean_axis, a, opts.axis);
+    return this._reduceAll(this._exports.wasm_mean, a);
+  }
+
+  max(a: NdArray, opts?: { axis?: number }): number | NdArray {
+    if (opts?.axis !== undefined) return this._reduceAxis(this._exports.wasm_max_axis, a, opts.axis);
+    return this._reduceAll(this._exports.wasm_max, a);
+  }
+
+  min(a: NdArray, opts?: { axis?: number }): number | NdArray {
+    if (opts?.axis !== undefined) return this._reduceAxis(this._exports.wasm_min_axis, a, opts.axis);
+    return this._reduceAll(this._exports.wasm_min, a);
+  }
+
+  prod(a: NdArray, opts?: { axis?: number }): number | NdArray {
+    if (opts?.axis !== undefined) return this._reduceAxis(this._exports.wasm_prod_axis, a, opts.axis);
+    return this._reduceAll(this._exports.wasm_prod, a);
+  }
+
+  argmax(a: NdArray): number {
+    return this._reduceAll(this._exports.wasm_argmax, a);
+  }
+
+  argmin(a: NdArray): number {
+    return this._reduceAll(this._exports.wasm_argmin, a);
   }
 }

@@ -124,12 +124,12 @@ General formula: `flat = Σ(indices[d] * product(shape[d+1..]))`
 
 **Goal**: `sum()`, `mean()`, `max()`, `min()` — with optional axis.
 
-- [ ] **7.1** Full reduction (no axis): iterate `self.data`, accumulate → return `f64`
-- [ ] **7.2** Axis reduction: compute output shape (input shape with axis removed). Iterate output indices, for each one loop over the reduced dimension, accumulate
-- [ ] **7.3** Implement generic `reduce(allocator, arr, comptime op, comptime identity, axis)` — shared iteration logic
-- [ ] **7.4** Wire up: `sum`, `mean` (sum / count), `max`, `min`, `prod`
-- [ ] **7.5** `argmax`, `argmin` — return index of best value
-- [ ] **7.6** Tests: `(3, 4)` sum axis 0 → `(4,)`, sum axis 1 → `(3,)`, no axis → scalar
+- [X] **7.1** Full reduction (no axis): iterate `self.data`, accumulate → return `f64`
+- [X] **7.2** Axis reduction: compute output shape (input shape with axis removed). Iterate output indices, for each one loop over the reduced dimension, accumulate
+- [X] **7.3** Implement generic `reduce(allocator, arr, comptime op, comptime identity, axis)` — shared iteration logic
+- [X] **7.4** Wire up: `sum`, `mean` (sum / count), `max`, `min`, `prod`
+- [X] **7.5** `argmax`, `argmin` — return index of best value
+- [X] **7.6** Tests: `(3, 4)` sum axis 0 → `(4,)`, sum axis 1 → `(3,)`, no axis → scalar
 
 ---
 
