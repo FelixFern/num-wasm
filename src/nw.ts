@@ -52,6 +52,9 @@ interface NumWasmExports {
   wasm_slice(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, dim: number, start: number, stop: number, step: number, outPtr: number): number;
   wasm_index_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, dim: number, index: number, outPtr: number): number;
   wasm_where(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, maskPtr: number, maskLen: number, outPtr: number): number;
+  wasm_dot(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number): number;
+  wasm_matmul(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number): number;
+  wasm_outer(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number): number;
 }
 
 export class NumWasm {
@@ -395,5 +398,28 @@ export class NumWasm {
     this._exports.wasm_free(maskPtr, mask.length * F64);
     if (rc !== 0) throw new Error(`where failed (rc=${rc})`);
     return this._readResult(outPtr);
+  }
+
+  dot(a: NdArray, b: NdArray): number {
+    if (a.shape.length !== 1 || b.shape.length !== 1) throw new Error("dot requires 1D arrays");
+    if (a.data.length !== b.data.length) throw new Error("dot requires equal lengths");
+    const ia = this._writeArray(a);
+    const ib = this._writeArray(b);
+    const result = this._exports.wasm_dot(ia.dataPtr, a.data.length, ia.shapePtr, ia.shapeLen, ib.dataPtr, b.data.length, ib.shapePtr, ib.shapeLen);
+    this._exports.wasm_free(ia.dataPtr, a.data.length * F64);
+    this._exports.wasm_free(ia.shapePtr, a.shape.length * USIZE);
+    this._exports.wasm_free(ib.dataPtr, b.data.length * F64);
+    this._exports.wasm_free(ib.shapePtr, b.shape.length * USIZE);
+    return result;
+  }
+
+  matmul(a: NdArray, b: NdArray): NdArray {
+    if (a.shape.length !== 2 || b.shape.length !== 2) throw new Error("matmul requires 2D arrays");
+    return this._callBinary(this._exports.wasm_matmul, a, b);
+  }
+
+  outer(a: NdArray, b: NdArray): NdArray {
+    if (a.shape.length !== 1 || b.shape.length !== 1) throw new Error("outer requires 1D arrays");
+    return this._callBinary(this._exports.wasm_outer, a, b);
   }
 }

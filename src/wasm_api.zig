@@ -4,6 +4,7 @@ const wasm_allocator = std.heap.wasm_allocator;
 const broadcasting = @import("core/broadcasting.zig");
 const creation = @import("core/creation.zig");
 const elementwise = @import("core/elementwise.zig");
+const linalg = @import("core/linalg.zig");
 const NDArray = @import("core/ndarray.zig").NDArray;
 const reduce = @import("core/reduce.zig");
 const shaper = @import("core/shape.zig");
@@ -316,6 +317,28 @@ export fn wasm_where(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shap
     const a = arrayFromPtrs(a_ptr, a_data_len, a_shape_ptr, a_shape_len);
     const mask = dataSlice(mask_ptr, mask_len);
     var res = slicing.whereMask(wasm_allocator, &a, mask) catch return -1;
+    writeResult(&res, out_ptr);
+    return 0;
+}
+
+export fn wasm_dot(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, b_ptr: usize, b_data_len: usize, b_shape_ptr: usize, b_shape_len: usize) f64 {
+    const a = arrayFromPtrs(a_ptr, a_data_len, a_shape_ptr, a_shape_len);
+    const b = arrayFromPtrs(b_ptr, b_data_len, b_shape_ptr, b_shape_len);
+    return linalg.dot(&a, &b) catch 0.0;
+}
+
+export fn wasm_matmul(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, b_ptr: usize, b_data_len: usize, b_shape_ptr: usize, b_shape_len: usize, out_ptr: usize) i32 {
+    const a = arrayFromPtrs(a_ptr, a_data_len, a_shape_ptr, a_shape_len);
+    const b = arrayFromPtrs(b_ptr, b_data_len, b_shape_ptr, b_shape_len);
+    var res = linalg.matmul(wasm_allocator, &a, &b) catch return -1;
+    writeResult(&res, out_ptr);
+    return 0;
+}
+
+export fn wasm_outer(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, b_ptr: usize, b_data_len: usize, b_shape_ptr: usize, b_shape_len: usize, out_ptr: usize) i32 {
+    const a = arrayFromPtrs(a_ptr, a_data_len, a_shape_ptr, a_shape_len);
+    const b = arrayFromPtrs(b_ptr, b_data_len, b_shape_ptr, b_shape_len);
+    var res = linalg.outer(wasm_allocator, &a, &b) catch return -1;
     writeResult(&res, out_ptr);
     return 0;
 }
