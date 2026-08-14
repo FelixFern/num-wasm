@@ -100,16 +100,12 @@ jobs:
             git log --pretty=format:"- %s" ${RANGE}
             echo ""
             echo ""
-          } > /tmp/release-notes.md
+          } > "$RUNNER_TEMP/release-notes.md"
 
           if [ -f packages/core/CHANGELOG.md ]; then
-            cat packages/core/CHANGELOG.md >> /tmp/release-notes.md
+            cat packages/core/CHANGELOG.md >> "$RUNNER_TEMP/release-notes.md"
           fi
-          cp /tmp/release-notes.md packages/core/CHANGELOG.md
-
-          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
-          cat /tmp/release-notes.md >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          cp "$RUNNER_TEMP/release-notes.md" packages/core/CHANGELOG.md
 
       - name: Commit and tag
         run: |
@@ -136,4 +132,4 @@ jobs:
           VERSION="v${{ steps.bump.outputs.version }}"
           gh release create "${VERSION}" \
             --title "${VERSION}" \
-            --notes "${{ steps.changelog.outputs.notes }}"
+            --notes-file "$RUNNER_TEMP/release-notes.md"

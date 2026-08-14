@@ -14,8 +14,7 @@ const demos = [
   {
     title: "Handwritten digit demo",
     desc: "Train an MLP on MNIST live in the browser and read back drawn digits — forward pass and backprop running on the Zig WASM kernel.",
-    logo: "./demo-mnist.svg",
-    href: "https://num-wasm-demo.vercel.app",
+    href: "https://numwasm-handwritten.vercel.app/",
   },
 ];
 
@@ -108,18 +107,8 @@ function Home() {
               key={d.title}
               className="flex flex-col gap-5 p-5 border rounded-xl border-zinc-800 bg-zinc-900/30 sm:flex-row sm:items-center"
             >
-              <img
-                src={d.logo}
-                alt=""
-                className="size-16 shrink-0 rounded-lg sm:size-20"
-              />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-medium">{d.title}</h3>
-                  <span
-                    className={`inline-block h-2 w-2 rounded-full ${d.href ? "bg-emerald-400" : "bg-zinc-600"}`}
-                  />
-                </div>
+                <h3 className="font-medium">{d.title}</h3>
                 <p className="mt-1 text-sm leading-relaxed text-zinc-500">
                   {d.desc}
                 </p>
