@@ -141,6 +141,98 @@ pub fn argmin(arr: *const NDArray) usize {
     return best;
 }
 
+pub fn argmaxAxis(allocator: Allocator, arr: *const NDArray, axis: usize) !NDArray {
+    if (axis >= arr.ndim) return error.OutOfBounds;
+
+    const out_shape = try allocator.alloc(usize, arr.ndim - 1);
+    defer allocator.free(out_shape);
+    for (arr.shape, 0..) |d, i| {
+        if (i < axis) {
+            out_shape[i] = d;
+        } else if (i > axis) {
+            out_shape[i - 1] = d;
+        }
+    }
+
+    var out = try NDArray.init(allocator, out_shape);
+    errdefer out.deinit();
+
+    const out_idx = try allocator.alloc(usize, arr.ndim - 1);
+    defer allocator.free(out_idx);
+    @memset(out_idx, 0);
+
+    const in_idx = try allocator.alloc(usize, arr.ndim);
+    defer allocator.free(in_idx);
+
+    for (out.data) |*dst| {
+        for (out_idx, 0..) |v, i| {
+            if (i < axis) in_idx[i] = v else in_idx[i + 1] = v;
+        }
+
+        var best_value = -std.math.inf(f64);
+        var best_index: usize = 0;
+        for (0..arr.shape[axis]) |k| {
+            in_idx[axis] = k;
+            const val = arr.getItem(in_idx);
+            if (val > best_value) {
+                best_value = val;
+                best_index = k;
+            }
+        }
+        dst.* = @floatFromInt(best_index);
+
+        if (!nextIndices(out_idx, out_shape)) break;
+    }
+
+    return out;
+}
+
+pub fn argminAxis(allocator: Allocator, arr: *const NDArray, axis: usize) !NDArray {
+    if (axis >= arr.ndim) return error.OutOfBounds;
+
+    const out_shape = try allocator.alloc(usize, arr.ndim - 1);
+    defer allocator.free(out_shape);
+    for (arr.shape, 0..) |d, i| {
+        if (i < axis) {
+            out_shape[i] = d;
+        } else if (i > axis) {
+            out_shape[i - 1] = d;
+        }
+    }
+
+    var out = try NDArray.init(allocator, out_shape);
+    errdefer out.deinit();
+
+    const out_idx = try allocator.alloc(usize, arr.ndim - 1);
+    defer allocator.free(out_idx);
+    @memset(out_idx, 0);
+
+    const in_idx = try allocator.alloc(usize, arr.ndim);
+    defer allocator.free(in_idx);
+
+    for (out.data) |*dst| {
+        for (out_idx, 0..) |v, i| {
+            if (i < axis) in_idx[i] = v else in_idx[i + 1] = v;
+        }
+
+        var best_value = std.math.inf(f64);
+        var best_index: usize = 0;
+        for (0..arr.shape[axis]) |k| {
+            in_idx[axis] = k;
+            const val = arr.getItem(in_idx);
+            if (val < best_value) {
+                best_value = val;
+                best_index = k;
+            }
+        }
+        dst.* = @floatFromInt(best_index);
+
+        if (!nextIndices(out_idx, out_shape)) break;
+    }
+
+    return out;
+}
+
 test "full reductions" {
     var arr = try NDArray.init(testing.allocator, &[_]usize{ 2, 3 });
     defer arr.deinit();
@@ -225,4 +317,58 @@ test "reduce 3D axis" {
 
     try testing.expectEqualSlices(usize, &[_]usize{ 2, 2 }, res.shape);
     try testing.expectEqualSlices(f64, &[_]f64{ 2.0, 4.0, 10.0, 12.0 }, res.data);
+}
+
+test "argmax axis 0 of (3,4)" {
+    var arr = try NDArray.init(testing.allocator, &[_]usize{ 3, 4 });
+    defer arr.deinit();
+    for (arr.data, 0..) |*v, i| v.* = @floatFromInt(i);
+    // arr[i][j] = i*4 + j
+    // col j argmax over rows: index 2 for all (2*4+j is largest)
+
+    var res = try argmaxAxis(testing.allocator, &arr, 0);
+    defer res.deinit();
+
+    try testing.expectEqualSlices(usize, &[_]usize{4}, res.shape);
+    try testing.expectEqualSlices(f64, &[_]f64{ 2.0, 2.0, 2.0, 2.0 }, res.data);
+}
+
+test "argmax axis 1 picks per-row max index" {
+    var arr = try NDArray.init(testing.allocator, &[_]usize{ 2, 3 });
+    defer arr.deinit();
+    // row 0: [5, 1, 3] → argmax 0 ; row 1: [0, 2, 9] → argmax 2
+    arr.data[0] = 5.0;
+    arr.data[1] = 1.0;
+    arr.data[2] = 3.0;
+    arr.data[3] = 0.0;
+    arr.data[4] = 2.0;
+    arr.data[5] = 9.0;
+
+    var res = try argmaxAxis(testing.allocator, &arr, 1);
+    defer res.deinit();
+
+    try testing.expectEqualSlices(usize, &[_]usize{2}, res.shape);
+    try testing.expectEqualSlices(f64, &[_]f64{ 0.0, 2.0 }, res.data);
+}
+
+test "argmin axis" {
+    var arr = try NDArray.init(testing.allocator, &[_]usize{ 2, 3 });
+    defer arr.deinit();
+    arr.data[0] = 5.0;
+    arr.data[1] = 1.0;
+    arr.data[2] = 3.0;
+    arr.data[3] = 0.0;
+    arr.data[4] = 2.0;
+    arr.data[5] = 9.0;
+
+    var res = try argminAxis(testing.allocator, &arr, 1);
+    defer res.deinit();
+
+    try testing.expectEqualSlices(f64, &[_]f64{ 1.0, 0.0 }, res.data);
+}
+
+test "argmax axis out of bounds errors" {
+    var arr = try NDArray.init(testing.allocator, &[_]usize{ 2, 2 });
+    defer arr.deinit();
+    try testing.expectError(error.OutOfBounds, argmaxAxis(testing.allocator, &arr, 5));
 }

@@ -185,12 +185,35 @@ a.free(); b.free(); c.free(); s.free();
 
 ---
 
+## Phase 11 — NumPy-like Ops for NN
+
+**Goal**: Provide the NumPy building blocks needed to implement a 2-layer MLP (forward + backprop + gradient descent) in JS, without writing any Zig. No `nn.ts` — you compose these ops yourself.
+
+- [ ] **11.1** `random(allocator, shape, seed) → NDArray` in `creation.zig` — `std.Random.DefaultPrng`, uniform `[0, 1)`. **Seed is required**: `wasm32-freestanding` has no OS entropy. Deterministic → reproducible training. Init weights via `random - 0.5` (`addScalar`).
+- [ ] **11.2** Comparisons in `elementwise.zig`: `greater`, `less`, `equal` → `0.0`/`1.0` f64 arrays. Covers `ReLU_deriv` (`Z > 0`), accuracy (`preds == y`), and one-hot via `equal(y.(m,1), classes.(10,))` broadcast.
+- [ ] **11.3** `maximum`/`minimum` in `elementwise.zig` (reuse `@max`/`@min`) — ReLU: `maximum(Z, 0)`.
+- [ ] **11.4** `argmaxAxis`/`argminAxis` in `reduce.zig` — axis versions returning reduced-shape `NDArray`; `get_predictions` = `argmax(A2, {axis: 0})` → `(n,)`.
+- [ ] **11.5** WASM exports + JS glue for all above: `nw.random(shape, seed)`, `nw.maximum/minimum`, `nw.greater/less/equal`, `nw.argmax(a, {axis:0})`.
+- [ ] **11.6** CSV adapter (JS): parse grid-string rows (`"1,2,3,..."`) → `nw.array`, normalize `÷255`, contiguous train/val split via `slice`.
+- [ ] **11.7** Native + Node tests, `tsc --noEmit`.
+
+**NN composition notes** (build on these, no new core ops):
+
+- Per-column softmax: `exp(Z)` ÷ `sum(Z, {axis: 0})` — broadcasting handles `(10,n) / (n,)`. Don't use the global `exp(Z)/sum(exp(Z))` form (that's a scalar, not per-column softmax).
+- `reshape(-1, x)` has no `-1` inference — compute the size in JS first, then pass exact shape.
+- Bias add `W·X + b` with `b` as `(10,1)` — `add` broadcasts, works out of the box.
+- One-hot: `equal` broadcast `(m,1)` vs `(10,)` → `(m,10)`, then `transpose` → `(10,m)`.
+
+---
+
 ## Tips
 
 1. **Test natively first** — `zig build test` is instant. Don't debug in the browser until you must.
 2. **`std.testing.allocator` detects memory leaks** — if your `deinit` misses a free, the test fails. This is your safety net.
 3. **Print from WASM** — Import a `consoleLog(ptr, len)` from JS env for debugging.
 4. **Upgrade path** — when you hit performance limits later, the upgrade to strides + `[*]u8` + DType is mechanical: same API surface, different internals.
+5. **Memory discipline in training loops** — every `nw.*` op allocates in WASM. In a tight `for` loop, call `.free()` on intermediates each iteration; `FinalizationRegistry` won't fire mid-loop and memory grows otherwise.
+6. **Performance** — `matmul` is a naive triple loop. Fine to ~1k rows × 500 iters; beyond that use the SIMD/BLAS upgrade path below.
 
 ---
 
