@@ -4,6 +4,17 @@
   "description": "NumPy-like array library written in Zig, compiled to WebAssembly for JavaScript/TypeScript",
   "main": "dist/nw.js",
   "types": "dist/nw.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/nw.d.ts",
+      "require": "./dist/nw.js",
+      "default": "./dist/nw.js"
+    },
+    "./browser": {
+      "types": "./dist/nw.browser.d.ts",
+      "default": "./dist/nw.browser.js"
+    }
+  },
   "files": [
     "dist",
     "README.md",
