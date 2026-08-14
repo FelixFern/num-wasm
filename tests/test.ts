@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { NumWasm } from "../src/nw";
-import { parseGridCsv } from "../src/csv";
 
 let passed = 0;
 let failed = 0;
@@ -484,31 +483,6 @@ async function main(): Promise<void> {
   test("nw.argmax no axis still returns number", () => {
     const a = nw.array([1, 5, 2]);
     assert.equal(nw.argmax(a), 1);
-  });
-
-  console.log("\nparseGridCsv:");
-  test("parseGridCsv plain columns", () => {
-    const csv = "label,p0,p1,p2\n1,1,2,3\n2,4,5,6\n";
-    const { x, y } = parseGridCsv(csv);
-    assert.deepEqual(y, [1, 2]);
-    assert.deepEqual(x, [[1, 2, 3], [4, 5, 6]]);
-  });
-
-  test("parseGridCsv quoted grid string", () => {
-    const csv = "label,grid\n5,\"1,2,3,4\"\n7,\"5,6,7,8\"\n";
-    const { x, y } = parseGridCsv(csv);
-    assert.deepEqual(y, [5, 7]);
-    assert.deepEqual(x, [[1, 2, 3, 4], [5, 6, 7, 8]]);
-  });
-
-  test("parseGridCsv feeds nw.array (MNIST-style pipeline)", () => {
-    const csv = "label,p1,p2,p3\n0,0,128,255\n1,255,0,128\n";
-    const { x, y } = parseGridCsv(csv);
-    const xArr = nw.divide(nw.array(x), nw.array([255]));
-    const yArr = nw.array(y);
-    assert.deepEqual(xArr.shape, [2, 3]);
-    assert.deepEqual(xArr.toArray().map((v) => Math.round(v)), [0, 1, 1, 1, 0, 1]);
-    assert.deepEqual(yArr.data, [0, 1]);
   });
 
   console.log(`\n${"─".repeat(40)}`);

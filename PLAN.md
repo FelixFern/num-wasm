@@ -189,13 +189,13 @@ a.free(); b.free(); c.free(); s.free();
 
 **Goal**: Provide the NumPy building blocks needed to implement a 2-layer MLP (forward + backprop + gradient descent) in JS, without writing any Zig. No `nn.ts` — you compose these ops yourself.
 
-- [ ] **11.1** `random(allocator, shape, seed) → NDArray` in `creation.zig` — `std.Random.DefaultPrng`, uniform `[0, 1)`. **Seed is required**: `wasm32-freestanding` has no OS entropy. Deterministic → reproducible training. Init weights via `random - 0.5` (`addScalar`).
-- [ ] **11.2** Comparisons in `elementwise.zig`: `greater`, `less`, `equal` → `0.0`/`1.0` f64 arrays. Covers `ReLU_deriv` (`Z > 0`), accuracy (`preds == y`), and one-hot via `equal(y.(m,1), classes.(10,))` broadcast.
-- [ ] **11.3** `maximum`/`minimum` in `elementwise.zig` (reuse `@max`/`@min`) — ReLU: `maximum(Z, 0)`.
-- [ ] **11.4** `argmaxAxis`/`argminAxis` in `reduce.zig` — axis versions returning reduced-shape `NDArray`; `get_predictions` = `argmax(A2, {axis: 0})` → `(n,)`.
-- [ ] **11.5** WASM exports + JS glue for all above: `nw.random(shape, seed)`, `nw.maximum/minimum`, `nw.greater/less/equal`, `nw.argmax(a, {axis:0})`.
-- [ ] **11.6** CSV adapter (JS): parse grid-string rows (`"1,2,3,..."`) → `nw.array`, normalize `÷255`, contiguous train/val split via `slice`.
-- [ ] **11.7** Native + Node tests, `tsc --noEmit`.
+- [X] **11.1** `random(allocator, shape, seed) → NDArray` in `creation.zig` — `std.Random.DefaultPrng`, uniform `[0, 1)`. **Seed is required**: `wasm32-freestanding` has no OS entropy. Deterministic → reproducible training. Init weights via `random - 0.5` (`addScalar`).
+- [X] **11.2** Comparisons in `elementwise.zig`: `greater`, `less`, `equal` → `0.0`/`1.0` f64 arrays. Covers `ReLU_deriv` (`Z > 0`), accuracy (`preds == y`), and one-hot via `equal(y.(m,1), classes.(10,))` broadcast.
+- [X] **11.3** `maximum`/`minimum` in `elementwise.zig` (reuse `@max`/`@min`) — ReLU: `maximum(Z, 0)`.
+- [X] **11.4** `argmaxAxis`/`argminAxis` in `reduce.zig` — axis versions returning reduced-shape `NDArray`; `get_predictions` = `argmax(A2, {axis: 0})` → `(n,)`.
+- [X] **11.5** WASM exports + JS glue for all above: `nw.random(shape, seed)`, `nw.maximum/minimum`, `nw.greater/less/equal`, `nw.argmax(a, {axis:0})`.
+- [X] **11.6** Data loading is external — removed CSV adapter; feed `nw.array(...)` directly from your own JS.
+- [X] **11.7** Native + Node tests, `tsc --noEmit`.
 
 **NN composition notes** (build on these, no new core ops):
 
