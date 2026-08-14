@@ -94,13 +94,14 @@ General formula: `flat = Σ(indices[d] * product(shape[d+1..]))`
 
 **Goal**: Enable operations between arrays of different shapes.
 
-- [ ] **5.1** Implement `broadcastShapes(allocator, shape_a, shape_b) → []usize` — align from right, each pair must be equal or one must be 1, result = max of pair, error if incompatible
-- [ ] **5.2** Implement `broadcastIndex(indices, original_shape, broadcast_shape) → []usize` — for each dimension, if `original_shape[d] == 1`, use index `0` regardless of the broadcast index (the element repeats)
-- [ ] **5.3** Tests:
+- [X] **5.1** Implement `broadcastShapes(allocator, shape_a, shape_b) → []usize` — align from right, each pair must be equal or one must be 1, result = max of pair, error if incompatible
+- [X] **5.2** Implement `broadcastIndex(indices, original_shape, broadcast_shape) → []usize` — for each dimension, if `original_shape[d] == 1`, use index `0` regardless of the broadcast index (the element repeats)
+- [X] **5.3** Tests:
   - `(3, 4) + (4,)` → `(3, 4)`
   - `(3, 1) + (1, 4)` → `(3, 4)`
   - scalar + `(3, 4)` → `(3, 4)`
   - `(3, 4) + (3, 5)` → error
+- [X] **5.4** Export `broadcastShapes` via `wasm_api.zig` (`wasm_broadcast_shapes` returns a bare `[]usize` — 2-word out buffer, not `writeResult`), wire `nw.broadcastShapes()` in JS (empty shape `[]` handled without alloc — `wasm_alloc(0)` returns a sentinel), test from Node.js
 
 **How broadcasting works without strides**: Instead of the stride=0 trick, use index remapping. When iterating the output shape, map each output index back to each input's index — if an input dim is 1, always use 0 for that dimension.
 
