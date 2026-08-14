@@ -16,6 +16,7 @@ interface NumWasmExports {
   wasm_full(shapePtr: number, shapeLen: number, value: number, outPtr: number): number;
   wasm_arange(start: number, stop: number, step: number, outPtr: number): number;
   wasm_linspace(start: number, stop: number, count: number, outPtr: number): number;
+  wasm_random(shapePtr: number, shapeLen: number, seed: number, outPtr: number): number;
   wasm_reshape(dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number, newShapePtr: number, newShapeLen: number, outPtr: number): number;
   wasm_transpose(dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number, outPtr: number): number;
   wasm_flatten(dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number, outPtr: number): number;
@@ -32,6 +33,16 @@ interface NumWasmExports {
   wasm_log(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, outPtr: number): number;
   wasm_add_scalar(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, value: number, outPtr: number): number;
   wasm_mul_scalar(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, value: number, outPtr: number): number;
+  wasm_maximum(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number): number;
+  wasm_minimum(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number): number;
+  wasm_greater(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number): number;
+  wasm_less(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number): number;
+  wasm_equal(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, bPtr: number, bDataLen: number, bShapePtr: number, bShapeLen: number, outPtr: number): number;
+  wasm_maximum_scalar(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, value: number, outPtr: number): number;
+  wasm_minimum_scalar(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, value: number, outPtr: number): number;
+  wasm_greater_scalar(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, value: number, outPtr: number): number;
+  wasm_less_scalar(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, value: number, outPtr: number): number;
+  wasm_equal_scalar(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, value: number, outPtr: number): number;
   wasm_sum(dataPtr: number, dataLen: number): number;
   wasm_mean(dataPtr: number, dataLen: number): number;
   wasm_max(dataPtr: number, dataLen: number): number;
@@ -44,6 +55,8 @@ interface NumWasmExports {
   wasm_max_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
   wasm_min_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
   wasm_prod_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
+  wasm_argmax_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
+  wasm_argmin_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, axis: number, outPtr: number): number;
   wasm_slice(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, dim: number, start: number, stop: number, step: number, outPtr: number): number;
   wasm_index_axis(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, dim: number, index: number, outPtr: number): number;
   wasm_where(aPtr: number, aDataLen: number, aShapePtr: number, aShapeLen: number, maskPtr: number, maskLen: number, outPtr: number): number;
@@ -305,6 +318,15 @@ export class NumWasm {
     return this._parseResult(outPtr);
   }
 
+  random(shape: number[], seed: number): NdArray {
+    const s = this._writeShape(shape);
+    const outPtr = this._allocOut();
+    const rc = this._exports.wasm_random(s.ptr, shape.length, seed, outPtr);
+    if (s.byteLen > 0) this._exports.wasm_free(s.ptr, s.byteLen);
+    if (rc !== 0) throw new Error(`random failed (rc=${rc})`);
+    return this._parseResult(outPtr);
+  }
+
   reshape(arr: NdArray, newShape: number[]): NdArray {
     const ns = this._writeShape(newShape);
     const res = this._callOnArray(
@@ -383,6 +405,46 @@ export class NumWasm {
     return this._callScalar(this._exports.wasm_mul_scalar, a, value);
   }
 
+  maximum(a: NdArray, b: NdArray): NdArray {
+    return this._callBinary(this._exports.wasm_maximum, a, b);
+  }
+
+  minimum(a: NdArray, b: NdArray): NdArray {
+    return this._callBinary(this._exports.wasm_minimum, a, b);
+  }
+
+  greater(a: NdArray, b: NdArray): NdArray {
+    return this._callBinary(this._exports.wasm_greater, a, b);
+  }
+
+  less(a: NdArray, b: NdArray): NdArray {
+    return this._callBinary(this._exports.wasm_less, a, b);
+  }
+
+  equal(a: NdArray, b: NdArray): NdArray {
+    return this._callBinary(this._exports.wasm_equal, a, b);
+  }
+
+  maximumScalar(a: NdArray, value: number): NdArray {
+    return this._callScalar(this._exports.wasm_maximum_scalar, a, value);
+  }
+
+  minimumScalar(a: NdArray, value: number): NdArray {
+    return this._callScalar(this._exports.wasm_minimum_scalar, a, value);
+  }
+
+  greaterScalar(a: NdArray, value: number): NdArray {
+    return this._callScalar(this._exports.wasm_greater_scalar, a, value);
+  }
+
+  lessScalar(a: NdArray, value: number): NdArray {
+    return this._callScalar(this._exports.wasm_less_scalar, a, value);
+  }
+
+  equalScalar(a: NdArray, value: number): NdArray {
+    return this._callScalar(this._exports.wasm_equal_scalar, a, value);
+  }
+
   sum(a: NdArray, opts?: { axis?: number }): number | NdArray {
     if (opts?.axis !== undefined) return this._reduceAxis(this._exports.wasm_sum_axis, a, opts.axis);
     return this._reduceAll(this._exports.wasm_sum, a);
@@ -408,11 +470,13 @@ export class NumWasm {
     return this._reduceAll(this._exports.wasm_prod, a);
   }
 
-  argmax(a: NdArray): number {
+  argmax(a: NdArray, opts?: { axis?: number }): number | NdArray {
+    if (opts?.axis !== undefined) return this._reduceAxis(this._exports.wasm_argmax_axis, a, opts.axis);
     return this._reduceAll(this._exports.wasm_argmax, a);
   }
 
-  argmin(a: NdArray): number {
+  argmin(a: NdArray, opts?: { axis?: number }): number | NdArray {
+    if (opts?.axis !== undefined) return this._reduceAxis(this._exports.wasm_argmin_axis, a, opts.axis);
     return this._reduceAll(this._exports.wasm_argmin, a);
   }
 

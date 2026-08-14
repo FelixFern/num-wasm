@@ -48,6 +48,14 @@ pub fn linspace(allocator: Allocator, start: f64, stop: f64, count: usize) !NDAr
     return arr;
 }
 
+pub fn random(allocator: Allocator, shape: []const usize, seed: u64) !NDArray {
+    const arr = try NDArray.init(allocator, shape);
+    var prng = std.Random.DefaultPrng.init(seed);
+    const rand = prng.random();
+    for (arr.data) |*v| v.* = rand.float(f64);
+    return arr;
+}
+
 test "zeros" {
     var arr = try zeros(testing.allocator, &[_]usize{ 2, 3 });
     defer arr.deinit();
@@ -113,4 +121,31 @@ test "linspace single point" {
 
     try testing.expectEqual(@as(usize, 1), arr.data.len);
     try testing.expectEqual(@as(f64, 5.0), arr.data[0]);
+}
+
+test "random is in [0,1)" {
+    var arr = try random(testing.allocator, &[_]usize{ 4, 3 }, 42);
+    defer arr.deinit();
+
+    for (arr.data) |v| {
+        try testing.expect(v >= 0.0 and v < 1.0);
+    }
+}
+
+test "random same seed is deterministic" {
+    var a = try random(testing.allocator, &[_]usize{5}, 7);
+    defer a.deinit();
+    var b = try random(testing.allocator, &[_]usize{5}, 7);
+    defer b.deinit();
+
+    try testing.expectEqualSlices(f64, a.data, b.data);
+}
+
+test "random different seed differs" {
+    var a = try random(testing.allocator, &[_]usize{8}, 1);
+    defer a.deinit();
+    var b = try random(testing.allocator, &[_]usize{8}, 2);
+    defer b.deinit();
+
+    try testing.expect(!std.mem.eql(f64, a.data, b.data));
 }

@@ -66,6 +66,13 @@ export fn wasm_linspace(start: f64, stop: f64, count: usize, out_ptr: usize) i32
     return 0;
 }
 
+export fn wasm_random(shape_ptr: usize, shape_len: usize, seed: u32, out_ptr: usize) i32 {
+    const shape = shapeSlice(shape_ptr, shape_len);
+    var arr = creation.random(wasm_allocator, shape, @as(u64, seed)) catch return -1;
+    writeResult(&arr, out_ptr);
+    return 0;
+}
+
 fn arrayFromPtrs(data_ptr: usize, data_len: usize, shape_ptr: usize, shape_len: usize) NDArray {
     const data: [*]f64 = @ptrFromInt(data_ptr);
     const shape_ptr_casted: [*]usize = @ptrFromInt(shape_ptr);
@@ -208,6 +215,46 @@ export fn wasm_mul_scalar(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a
     return callScalar(elementwise.mulScalar, a_ptr, a_data_len, a_shape_ptr, a_shape_len, value, out_ptr);
 }
 
+export fn wasm_maximum(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, b_ptr: usize, b_data_len: usize, b_shape_ptr: usize, b_shape_len: usize, out_ptr: usize) i32 {
+    return callBinary(elementwise.maximum, a_ptr, a_data_len, a_shape_ptr, a_shape_len, b_ptr, b_data_len, b_shape_ptr, b_shape_len, out_ptr);
+}
+
+export fn wasm_minimum(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, b_ptr: usize, b_data_len: usize, b_shape_ptr: usize, b_shape_len: usize, out_ptr: usize) i32 {
+    return callBinary(elementwise.minimum, a_ptr, a_data_len, a_shape_ptr, a_shape_len, b_ptr, b_data_len, b_shape_ptr, b_shape_len, out_ptr);
+}
+
+export fn wasm_greater(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, b_ptr: usize, b_data_len: usize, b_shape_ptr: usize, b_shape_len: usize, out_ptr: usize) i32 {
+    return callBinary(elementwise.greater, a_ptr, a_data_len, a_shape_ptr, a_shape_len, b_ptr, b_data_len, b_shape_ptr, b_shape_len, out_ptr);
+}
+
+export fn wasm_less(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, b_ptr: usize, b_data_len: usize, b_shape_ptr: usize, b_shape_len: usize, out_ptr: usize) i32 {
+    return callBinary(elementwise.less, a_ptr, a_data_len, a_shape_ptr, a_shape_len, b_ptr, b_data_len, b_shape_ptr, b_shape_len, out_ptr);
+}
+
+export fn wasm_equal(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, b_ptr: usize, b_data_len: usize, b_shape_ptr: usize, b_shape_len: usize, out_ptr: usize) i32 {
+    return callBinary(elementwise.equal, a_ptr, a_data_len, a_shape_ptr, a_shape_len, b_ptr, b_data_len, b_shape_ptr, b_shape_len, out_ptr);
+}
+
+export fn wasm_maximum_scalar(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, value: f64, out_ptr: usize) i32 {
+    return callScalar(elementwise.maximumScalar, a_ptr, a_data_len, a_shape_ptr, a_shape_len, value, out_ptr);
+}
+
+export fn wasm_minimum_scalar(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, value: f64, out_ptr: usize) i32 {
+    return callScalar(elementwise.minimumScalar, a_ptr, a_data_len, a_shape_ptr, a_shape_len, value, out_ptr);
+}
+
+export fn wasm_greater_scalar(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, value: f64, out_ptr: usize) i32 {
+    return callScalar(elementwise.greaterScalar, a_ptr, a_data_len, a_shape_ptr, a_shape_len, value, out_ptr);
+}
+
+export fn wasm_less_scalar(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, value: f64, out_ptr: usize) i32 {
+    return callScalar(elementwise.lessScalar, a_ptr, a_data_len, a_shape_ptr, a_shape_len, value, out_ptr);
+}
+
+export fn wasm_equal_scalar(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, value: f64, out_ptr: usize) i32 {
+    return callScalar(elementwise.equalScalar, a_ptr, a_data_len, a_shape_ptr, a_shape_len, value, out_ptr);
+}
+
 fn callReduceAxis(
     comptime op: anytype,
     a_ptr: usize,
@@ -297,6 +344,14 @@ export fn wasm_min_axis(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_s
 
 export fn wasm_prod_axis(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, axis: usize, out_ptr: usize) i32 {
     return callReduceAxis(reduce.prodAxis, a_ptr, a_data_len, a_shape_ptr, a_shape_len, axis, out_ptr);
+}
+
+export fn wasm_argmax_axis(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, axis: usize, out_ptr: usize) i32 {
+    return callReduceAxis(reduce.argmaxAxis, a_ptr, a_data_len, a_shape_ptr, a_shape_len, axis, out_ptr);
+}
+
+export fn wasm_argmin_axis(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, axis: usize, out_ptr: usize) i32 {
+    return callReduceAxis(reduce.argminAxis, a_ptr, a_data_len, a_shape_ptr, a_shape_len, axis, out_ptr);
 }
 
 export fn wasm_slice(a_ptr: usize, a_data_len: usize, a_shape_ptr: usize, a_shape_len: usize, dim: usize, start: i32, stop: i32, step: i32, out_ptr: usize) i32 {

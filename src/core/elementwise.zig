@@ -87,6 +87,11 @@ const OpExp = struct { fn f(a: f64) f64 { return @exp(a); } };
 const OpLog = struct { fn f(a: f64) f64 { return @log(a); } };
 const OpAddScalar = struct { fn f(a: f64, b: f64) f64 { return a + b; } };
 const OpMulScalar = struct { fn f(a: f64, b: f64) f64 { return a * b; } };
+const OpMax = struct { fn f(a: f64, b: f64) f64 { return @max(a, b); } };
+const OpMin = struct { fn f(a: f64, b: f64) f64 { return @min(a, b); } };
+const OpGreater = struct { fn f(a: f64, b: f64) f64 { return if (a > b) 1.0 else 0.0; } };
+const OpLess = struct { fn f(a: f64, b: f64) f64 { return if (a < b) 1.0 else 0.0; } };
+const OpEqual = struct { fn f(a: f64, b: f64) f64 { return if (a == b) 1.0 else 0.0; } };
 
 pub fn add(allocator: Allocator, a: *const NDArray, b: *const NDArray) !NDArray {
     return binaryOp(allocator, a, b, OpAdd.f);
@@ -130,6 +135,46 @@ pub fn addScalar(allocator: Allocator, a: *const NDArray, value: f64) !NDArray {
 
 pub fn mulScalar(allocator: Allocator, a: *const NDArray, value: f64) !NDArray {
     return scalarOp(allocator, a, value, OpMulScalar.f);
+}
+
+pub fn maximum(allocator: Allocator, a: *const NDArray, b: *const NDArray) !NDArray {
+    return binaryOp(allocator, a, b, OpMax.f);
+}
+
+pub fn minimum(allocator: Allocator, a: *const NDArray, b: *const NDArray) !NDArray {
+    return binaryOp(allocator, a, b, OpMin.f);
+}
+
+pub fn maximumScalar(allocator: Allocator, a: *const NDArray, value: f64) !NDArray {
+    return scalarOp(allocator, a, value, OpMax.f);
+}
+
+pub fn minimumScalar(allocator: Allocator, a: *const NDArray, value: f64) !NDArray {
+    return scalarOp(allocator, a, value, OpMin.f);
+}
+
+pub fn greater(allocator: Allocator, a: *const NDArray, b: *const NDArray) !NDArray {
+    return binaryOp(allocator, a, b, OpGreater.f);
+}
+
+pub fn less(allocator: Allocator, a: *const NDArray, b: *const NDArray) !NDArray {
+    return binaryOp(allocator, a, b, OpLess.f);
+}
+
+pub fn equal(allocator: Allocator, a: *const NDArray, b: *const NDArray) !NDArray {
+    return binaryOp(allocator, a, b, OpEqual.f);
+}
+
+pub fn greaterScalar(allocator: Allocator, a: *const NDArray, value: f64) !NDArray {
+    return scalarOp(allocator, a, value, OpGreater.f);
+}
+
+pub fn lessScalar(allocator: Allocator, a: *const NDArray, value: f64) !NDArray {
+    return scalarOp(allocator, a, value, OpLess.f);
+}
+
+pub fn equalScalar(allocator: Allocator, a: *const NDArray, value: f64) !NDArray {
+    return scalarOp(allocator, a, value, OpEqual.f);
 }
 
 test "add (3,1) + (1,4) → (3,4) broadcast" {
@@ -278,4 +323,75 @@ test "same shape add is elementwise" {
     defer res.deinit();
 
     try testing.expectEqualSlices(f64, &[_]f64{ 0.0, 11.0, 22.0, 33.0 }, res.data);
+}
+
+test "maximum and minimum" {
+    const allocator = testing.allocator;
+    var a = try NDArray.init(allocator, &[_]usize{3});
+    defer a.deinit();
+    var b = try NDArray.init(allocator, &[_]usize{3});
+    defer b.deinit();
+    a.data[0] = 1.0;
+    a.data[1] = -5.0;
+    a.data[2] = 3.0;
+    b.data[0] = 2.0;
+    b.data[1] = -1.0;
+    b.data[2] = -1.0;
+
+    var mx = try maximum(allocator, &a, &b);
+    defer mx.deinit();
+    try testing.expectEqualSlices(f64, &[_]f64{ 2.0, -1.0, 3.0 }, mx.data);
+
+    var mn = try minimum(allocator, &a, &b);
+    defer mn.deinit();
+    try testing.expectEqualSlices(f64, &[_]f64{ 1.0, -5.0, -1.0 }, mn.data);
+
+    // ReLU: maximum(Z, 0)
+    var relu = try maximumScalar(allocator, &a, 0.0);
+    defer relu.deinit();
+    try testing.expectEqualSlices(f64, &[_]f64{ 1.0, 0.0, 3.0 }, relu.data);
+}
+
+test "comparisons return 0/1" {
+    const allocator = testing.allocator;
+    var a = try NDArray.init(allocator, &[_]usize{4});
+    defer a.deinit();
+    for (a.data, 0..) |*v, i| v.* = @floatFromInt(i); // 0..3
+
+    var gt = try greaterScalar(allocator, &a, 1.0);
+    defer gt.deinit();
+    try testing.expectEqualSlices(f64, &[_]f64{ 0.0, 0.0, 1.0, 1.0 }, gt.data);
+
+    var ls = try lessScalar(allocator, &a, 2.0);
+    defer ls.deinit();
+    try testing.expectEqualSlices(f64, &[_]f64{ 1.0, 1.0, 0.0, 0.0 }, ls.data);
+
+    var eq = try equalScalar(allocator, &a, 2.0);
+    defer eq.deinit();
+    try testing.expectEqualSlices(f64, &[_]f64{ 0.0, 0.0, 1.0, 0.0 }, eq.data);
+}
+
+test "equal broadcasts for one-hot" {
+    const allocator = testing.allocator;
+    var y = try NDArray.init(allocator, &[_]usize{ 3, 1 }); // (m,1)
+    defer y.deinit();
+    y.data[0] = 0.0;
+    y.data[1] = 2.0;
+    y.data[2] = 1.0;
+    var classes = try NDArray.init(allocator, &[_]usize{3});
+    defer classes.deinit();
+    classes.data[0] = 0.0;
+    classes.data[1] = 1.0;
+    classes.data[2] = 2.0;
+
+    var res = try equal(allocator, &y, &classes); // (3,1) vs (3,) → (3,3)
+    defer res.deinit();
+
+    try testing.expectEqualSlices(usize, &[_]usize{ 3, 3 }, res.shape);
+    // row for sample 0: [1,0,0]; sample 2: [0,0,1]; sample 1: [0,1,0]
+    try testing.expectEqualSlices(f64, &[_]f64{
+        1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0,
+        0.0, 1.0, 0.0,
+    }, res.data);
 }
