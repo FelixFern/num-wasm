@@ -1,6 +1,7 @@
 const std = @import("std");
 const wasm_allocator = std.heap.wasm_allocator;
 
+const broadcasting = @import("core/broadcasting.zig");
 const creation = @import("core/creation.zig");
 const NDArray = @import("core/ndarray.zig").NDArray;
 const shaper = @import("core/shape.zig");
@@ -98,5 +99,15 @@ export fn wasm_squeeze(data_ptr: usize, data_len: usize, shape_ptr: usize, shape
     const arr = arrayFromPtrs(data_ptr, data_len, shape_ptr, shape_len);
     var res = shaper.squeeze(wasm_allocator, &arr) catch return -1;
     writeResult(&res, out_ptr);
+    return 0;
+}
+
+export fn wasm_broadcast_shapes(a_ptr: usize, a_len: usize, b_ptr: usize, b_len: usize, out_ptr: usize) i32 {
+    const a = shapeSlice(a_ptr, a_len);
+    const b = shapeSlice(b_ptr, b_len);
+    const res = broadcasting.broadcastShapes(wasm_allocator, a, b) catch return -1;
+    const out: [*]usize = @ptrFromInt(out_ptr);
+    out[0] = @intFromPtr(res.ptr);
+    out[1] = res.len;
     return 0;
 }

@@ -123,6 +123,27 @@ async function main(): Promise<void> {
     assert.deepEqual(s.data, [0, 1, 2, 3, 4, 5]);
   });
 
+  console.log("\nnw.broadcastShapes:");
+  test("nw.broadcastShapes([3,1], [1,4]) → [3,4]", () => {
+    assert.deepEqual(nw.broadcastShapes([3, 1], [1, 4]), [3, 4]);
+  });
+
+  test("nw.broadcastShapes([3,4], [4]) → [3,4]", () => {
+    assert.deepEqual(nw.broadcastShapes([3, 4], [4]), [3, 4]);
+  });
+
+  test("nw.broadcastShapes([], [3,4]) → [3,4]", () => {
+    assert.deepEqual(nw.broadcastShapes([], [3, 4]), [3, 4]);
+  });
+
+  test("nw.broadcastShapes([3,4], [3,5]) throws", () => {
+    assert.throws(() => nw.broadcastShapes([3, 4], [3, 5]));
+  });
+
+  test("nw.broadcastShapes([2,3,1], [4]) → [2,3,4]", () => {
+    assert.deepEqual(nw.broadcastShapes([2, 3, 1], [4]), [2, 3, 4]);
+  });
+
   console.log(`\n${"─".repeat(40)}`);
   console.log(`${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);

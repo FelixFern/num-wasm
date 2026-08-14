@@ -25,6 +25,7 @@ interface NumWasmExports {
   wasm_transpose(dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number, outPtr: number): number;
   wasm_flatten(dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number, outPtr: number): number;
   wasm_squeeze(dataPtr: number, dataLen: number, shapePtr: number, shapeLen: number, outPtr: number): number;
+  wasm_broadcast_shapes(aPtr: number, aLen: number, bPtr: number, bLen: number, outPtr: number): number;
 }
 
 export class NumWasm {
@@ -43,6 +44,7 @@ export class NumWasm {
   }
 
   private _writeShape(shape: number[]): { ptr: number; byteLen: number } {
+    if (shape.length === 0) return { ptr: 0, byteLen: 0 };
     const byteLen = shape.length * USIZE;
     const ptr = this._exports.wasm_alloc(byteLen);
     if (ptr === 0) throw new Error("alloc failed for shape");
@@ -54,6 +56,17 @@ export class NumWasm {
     const ptr = this._exports.wasm_alloc(4 * USIZE);
     if (ptr === 0) throw new Error("alloc failed for out buffer");
     return ptr;
+  }
+
+  private _readUsizeArray(outPtr: number): number[] {
+    const out = new Uint32Array(this._memory.buffer, outPtr, 2);
+    const ptr = out[0];
+    const len = out[1];
+    this._exports.wasm_free(outPtr, 2 * USIZE);
+
+    const values = Array.from(new Uint32Array(this._memory.buffer, ptr, len));
+    this._exports.wasm_free(ptr, len * USIZE);
+    return values;
   }
 
   private _readResult(outPtr: number): NdArray {
@@ -157,5 +170,17 @@ export class NumWasm {
 
   squeeze(arr: NdArray): NdArray {
     return this._callOnArray(this._exports.wasm_squeeze, arr);
+  }
+
+  broadcastShapes(a: number[], b: number[]): number[] {
+    const sa = this._writeShape(a);
+    const sb = this._writeShape(b);
+    const outPtr = this._exports.wasm_alloc(2 * USIZE);
+    if (outPtr === 0) throw new Error("alloc failed for out buffer");
+    const rc = this._exports.wasm_broadcast_shapes(sa.ptr, a.length, sb.ptr, b.length, outPtr);
+    if (sa.byteLen > 0) this._exports.wasm_free(sa.ptr, sa.byteLen);
+    if (sb.byteLen > 0) this._exports.wasm_free(sb.ptr, sb.byteLen);
+    if (rc !== 0) throw new Error(`broadcast_shapes failed (rc=${rc})`);
+    return this._readUsizeArray(outPtr);
   }
 }
