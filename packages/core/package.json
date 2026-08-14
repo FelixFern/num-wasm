@@ -1,6 +1,6 @@
 {
   "name": "@felixfern/num-wasm",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "NumPy-like array library written in Zig, compiled to WebAssembly for JavaScript/TypeScript",
   "main": "dist/nw.js",
   "types": "dist/nw.d.ts",
