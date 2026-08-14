@@ -1,25 +1,45 @@
 {
   "name": "num-wasm",
   "version": "1.0.0",
-  "main": "index.js",
-  "directories": {
-    "test": "tests"
-  },
+  "description": "NumPy-like array library written in Zig, compiled to WebAssembly for JavaScript/TypeScript",
+  "main": "dist/nw.js",
+  "types": "dist/nw.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "docs/PLAN.md",
+    "docs/USAGE.md"
+  ],
   "scripts": {
-    "test": "npx tsx tests/test.ts"
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-wasm.mjs",
+    "prepublishOnly": "zig build wasm && pnpm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx tests/test.ts"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/FelixFern/numwasm.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "numpy",
+    "ndarray",
+    "array",
+    "wasm",
+    "webassembly",
+    "zig",
+    "neural-network",
+    "machine-learning"
+  ],
+  "author": "felixfern",
   "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
   "bugs": {
     "url": "https://github.com/FelixFern/numwasm/issues"
   },
   "homepage": "https://github.com/FelixFern/numwasm#readme",
-  "description": "",
   "devDependencies": {
     "@types/node": "^25.5.0",
     "tsx": "^4.21.0",

@@ -1,9 +1,18 @@
 import fs from "fs";
 import path from "path";
 
-const WASM_PATH = path.join(__dirname, "../zig-out/bin/num-wasm.wasm");
 const USIZE = 4;
 const F64 = 8;
+
+function resolveWasmPath(): string {
+  const candidates = [
+    path.join(__dirname, "num-wasm.wasm"),
+    path.join(__dirname, "../zig-out/bin/num-wasm.wasm"),
+  ];
+  return candidates.find((p) => fs.existsSync(p)) ?? candidates[0];
+}
+
+const WASM_PATH = resolveWasmPath();
 
 interface NumWasmExports {
   memory: WebAssembly.Memory;
