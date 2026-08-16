@@ -163,6 +163,13 @@ export class NumWasm {
     return new NumWasm(instance);
   }
 
+  // Browser default: resolve the packaged wasm next to this module. Bundlers
+  // rewrite `new URL(..., import.meta.url)` into a fetchable asset URL.
+  static async init(): Promise<NumWasm> {
+    const url = new URL("../num-wasm.wasm", import.meta.url);
+    return NumWasm.initFromUrl(url.href);
+  }
+
   static async initFromResponse(res: Response): Promise<NumWasm> {
     const bytes = await res.arrayBuffer();
     return NumWasm.initFromBytes(bytes);

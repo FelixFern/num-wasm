@@ -1,1 +1,1 @@
-export { NumWasm, NdArray } from "./lib/core";
+export { NumWasm, NdArray } from "./lib/core.js";
