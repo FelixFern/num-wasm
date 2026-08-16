@@ -3,11 +3,14 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter @felixfern/num-wasm-web dev",
+    "dev:demos": "pnpm --filter @felixfern/num-wasm-demos dev",
     "build": "pnpm -r build",
     "build:lib": "pnpm --filter @felixfern/num-wasm build",
     "build:web": "pnpm --filter @felixfern/num-wasm-web build",
+    "build:demos": "pnpm --filter @felixfern/num-wasm-demos build",
     "test": "pnpm --filter @felixfern/num-wasm test",
-    "typecheck": "pnpm --filter @felixfern/num-wasm typecheck"
+    "typecheck": "pnpm --filter @felixfern/num-wasm typecheck",
+    "verify:demos": "pnpm --filter @felixfern/num-wasm-demos verify"
   },
   "engines": {
     "node": ">=20"

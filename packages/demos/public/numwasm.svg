@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="56" fill="#ffffff"/>
+  <text x="252" y="348" font-family="JetBrains Mono, monospace" font-size="300" font-weight="700" fill="#0c0f12" text-anchor="middle">N</text>
+  <g fill="#0c0f12">
+    <circle cx="408" cy="404" r="10"/>
+    <circle cx="452" cy="404" r="10"/>
+    <circle cx="408" cy="448" r="10"/>
+    <circle cx="452" cy="448" r="10"/>
+  </g>
+</svg>

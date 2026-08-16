@@ -1,0 +1,36 @@
+{
+  "name": "@felixfern/num-wasm-demos",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "verify": "pnpm exec tsx scripts/verify.ts",
+    "verify:kmeans": "pnpm exec tsx scripts/verify-kmeans.ts",
+    "verify:regression": "pnpm exec tsx scripts/verify-regression.ts",
+    "verify:knn": "pnpm exec tsx scripts/verify-knn.ts",
+    "verify:pca": "pnpm exec tsx scripts/verify-pca.ts",
+    "verify:convolve": "pnpm exec tsx scripts/verify-convolve.ts",
+    "verify:monte": "pnpm exec tsx scripts/verify-monte.ts"
+  },
+  "dependencies": {
+    "@felixfern/num-wasm": "workspace:*",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@esbuild/darwin-x64": "^0.28.2",
+    "@rolldown/binding-darwin-x64": "^1.2.4",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "oxlint": "^1.75.0",
+    "tsx": "^4.23.12",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0"
+  }
+}
