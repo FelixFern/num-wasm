@@ -131,11 +131,11 @@ function Home() {
         <p className="mb-6 text-sm text-zinc-500">
           The library in action.
         </p>
-        <div className="flex flex-col gap-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {demos.map((d) => (
             <div
               key={d.title}
-              className="flex flex-col gap-5 p-5 border rounded-xl border-zinc-800 bg-zinc-900/30 sm:flex-row sm:items-center"
+              className="flex flex-col gap-4 p-5 border rounded-xl border-zinc-800 bg-zinc-900/30"
             >
               <div className="flex-1 min-w-0">
                 <h3 className="font-medium">{d.title}</h3>
