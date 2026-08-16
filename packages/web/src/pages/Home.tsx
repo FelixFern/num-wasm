@@ -14,7 +14,37 @@ const demos = [
   {
     title: "Handwritten digit demo",
     desc: "Train an MLP on MNIST live in the browser and read back drawn digits — forward pass and backprop running on the Zig WASM kernel.",
-    href: "https://numwasm-handwritten.vercel.app/",
+    href: "https://numwasm-demos.vercel.app/#/handwritten",
+  },
+  {
+    title: "K-means clustering",
+    desc: "Lloyd's algorithm on 2D points — assignment by matmul + argmin, centroids as (GᵀP)/ΣG, animate each iteration.",
+    href: "https://numwasm-demos.vercel.app/#/kmeans",
+  },
+  {
+    title: "Linear & logistic regression",
+    desc: "Gradient descent on wasm — click the plot to add points and watch the curve refit live.",
+    href: "https://numwasm-demos.vercel.app/#/regression",
+  },
+  {
+    title: "K-nearest neighbours",
+    desc: "Lazy classifier — matmul distances, iterated argmin top-k, click anywhere to probe the decision boundary.",
+    href: "https://numwasm-demos.vercel.app/#/knn",
+  },
+  {
+    title: "PCA",
+    desc: "Covariance and power iteration on wasm — top eigenvector, variance explained, rotated projection.",
+    href: "https://numwasm-demos.vercel.app/#/pca",
+  },
+  {
+    title: "Image convolution",
+    desc: "3×3 filters (blur, sharpen, sobel, …) as a single patches-matmul over a 28×28 image.",
+    href: "https://numwasm-demos.vercel.app/#/convolve",
+  },
+  {
+    title: "Monte Carlo π",
+    desc: "Hit-or-miss sampling on wasm — uniform draws, sum(x²+y²)<1, watch the estimate converge to π.",
+    href: "https://numwasm-demos.vercel.app/#/monte",
   },
 ];
 
