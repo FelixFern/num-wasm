@@ -1,0 +1,1 @@
+{"version":3,"file":"nw.d.ts","sourceRoot":"","sources":["../src/nw.ts"],"names":[],"mappings":"AAGA,OAAO,EAAE,OAAO,IAAI,WAAW,EAAE,OAAO,EAAE,MAAM,eAAe,CAAC;AAEhE,OAAO,EAAE,OAAO,EAAE,CAAC;AACnB,YAAY,EAAE,cAAc,EAAE,WAAW,EAAE,MAAM,eAAe,CAAC;AAYjE,qBAAa,OAAQ,SAAQ,WAAW;WACzB,IAAI,IAAI,OAAO,CAAC,OAAO,CAAC;CAItC"}

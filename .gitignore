@@ -4,3 +4,4 @@ node_modules
 PR.md
 dist
 zig-out
+!packages/core/dist/
