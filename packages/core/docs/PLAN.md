@@ -204,9 +204,48 @@ a.free(); b.free(); c.free(); s.free();
 - Bias add `W·X + b` with `b` as `(10,1)` — `add` broadcasts, works out of the box.
 - One-hot: `equal` broadcast `(m,1)` vs `(10,)` → `(m,10)`, then `transpose` → `(10,m)`.
 
+## Phase 12 — API Gaps (next features)
+
+**Goal**: Close the ops the demos (and a real NN pipeline) hand-code today. Every item below replaces a JS-side composition or JS loop with a fused, allocation-light wasm op.
+
+- [ ] **12.1** `softmax(a, {axis})` — fused, numerically stable (subtract row max before `exp`). Replaces the 4-op composition in `mlp.ts` (exp + sum-axis + divide) and drops 3 temporary allocations per call.
+- [ ] **12.2** `sigmoid(a)` / `tanh(a)` — fused `1/(1+e^-z)` (and `(e^z−e^-z)/(e^z+e^-z)`). Current demos compose `negate+exp+addScalar+divide`.
+- [ ] **12.3** `clip(a, min, max)` / `clipScalar` — `maximum(minimum(a,max),min)` fused in one pass; use for gradient clipping.
+- [ ] **12.4** `pow(a, exp)` (element-wise, `@pow`) + `squared(a)`. Loss/distance formulas need it.
+- [ ] **12.5** `norm(a, {axis})` → L2 per slice; `normalize(a, {axis})` = `a / norm(a)`. PCA/MLP currently do `Math.sqrt` in JS after `sum` of squares.
+- [ ] **12.6** `var` / `std` (full + axis) — mlp/pca variance computed in JS today.
+- [ ] **12.7** `concatenate(list, {axis})` / `stack(list, axis)` — assemble batches without the JS `map → nw.array` round-trip (knn grid rows, mlp `buildX`).
+- [ ] **12.8** `sort` / `argsort` — clean top-k for k-NN, killing the iterated `argmin`+mask trick. `nonzero` / `argwhere` complements `where`.
+- [ ] **12.9** `randomNormal(shape, seed, mean, std)` — Box–Muller in wasm (better than the demos' sum-of-8-uniforms hack) + `randint(low, high, shape, seed)`.
+- [ ] **12.10** Overload unification — scalar variants accept a plain `number`, and `where` accepts an `NdArray` mask (not just `number[]`). Reduces JS-side conversions.
+
 ---
 
-## Tips
+## Phase 13 — Performance
+
+**Goal**: Keep the simple flat-`[]f64` design; squeeze it before reaching for strides/dtype redesign. Measured via `scripts/bench.ts`.
+
+### Tier 1 — allocation churn (biggest win, cheapest)
+
+Current hot path allocates per op: `data` + `shape` in wasm, a 4-word out buffer, a JS `NdArray` wrapper, and a `FinalizationRegistry` entry. In a training loop this dominates real cost.
+
+- [ ] **13.1** Scoped arena — `nw.scope(() => …)` bump-allocates all temporaries from one pre-grown wasm blob and frees them in one shot at scope exit. Ops allocate from the arena by default; results that escape (returned/held `NdArray`s) are promoted to the persistent heap. Mid-loop `.free()` calls become unnecessary inside a scope.
+- [ ] **13.2** Intern metadata — shape vectors, `arange(k)`, and `ones(n)` buffers cached by key instead of re-allocated (one-hot construction allocates `arange` every call).
+- [ ] **13.3** Slim result transport — pack `{dataPtr, dataLen, shapePtr, shapeLen}` in one wasm return/out-slot instead of the 4-word indirection; shaves 1–2 wasm calls per op.
+
+### Tier 2 — compute
+
+- [ ] **13.4** SIMD matmul — `@setTargetCpu` with a SIMD-capable feature (`+simd128`), vectorize the inner dot with `@Vector`, switch to IKJ loop order + blocking. Expect 3–4× on dense matmul; MLP forward/backward, k-means assignment, and k-NN grid are all matmul-dominated.
+- [ ] **13.5** Element-wise broadcast loop without per-element index arrays — precompute per-dim stride multipliers, collapse contiguous dims, run flat runs per output row. Removes the current `broadcastIndex(indices, …)` allocation/remap per element (Phase 5 approach).
+- [ ] **13.6** Fused softmax/sigmoid/logsumexp (Phase 12) remove the 3–4 temporary allocs these compositions currently cost; pairs with 13.1.
+
+### Tier 3 — optional architecture redesign (defer until measured)
+
+- [ ] **13.7** Strides + views — transpose/slice stop copying (add `owns_data` + `base` pointer). Only after 13.1–13.6 plateau.
+- [ ] **13.8** Multi-dtype — `[*]u8` + `DType` enum; `f32` halves memory and speeds cache-bound ops after 13.4.
+- [ ] **13.9** WASM threads — workers share a `SharedArrayBuffer` memory and partition matmul/convolution rows (needs `--experimental-wasm-threads` / cross-origin isolation in the browser).
+
+---
 
 1. **Test natively first** — `zig build test` is instant. Don't debug in the browser until you must.
 2. **`std.testing.allocator` detects memory leaks** — if your `deinit` misses a free, the test fails. This is your safety net.

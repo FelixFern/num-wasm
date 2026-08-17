@@ -1,5 +1,7 @@
 import type { NdArray, NumWasm } from "@felixfern/num-wasm/browser";
-import { gaussianField, squaredDistances } from "./kmeans";
+import { generateRingBlobs, idxVec, oneHotFromIdx, squaredDistances } from "./util";
+
+export { generateRingBlobs } from "./util";
 
 export interface KnnPoint {
   x: number;
@@ -13,21 +15,13 @@ export function generateKnnData(
   classes: number,
   seed: number,
 ): KnnPoint[] {
-  const n = perClass * classes;
-  const nx = gaussianField(nw, n, seed + 1, 0.035);
-  const ny = gaussianField(nw, n, seed + 2, 0.035);
-  const pts: KnnPoint[] = [];
-  for (let i = 0; i < n; i++) {
-    const label = i % classes;
-    const t = (label / classes) * Math.PI * 2;
-    pts.push({ x: 0.5 + 0.28 * Math.cos(t) + nx[i], y: 0.5 + 0.28 * Math.sin(t) + ny[i], label });
-  }
-  return pts;
+  // Ring blobs give round, well-separated classes — same geometry as k-means.
+  return generateRingBlobs(nw, perClass * classes, classes, seed, 0.035);
 }
 
 // Majority vote over the k nearest training points, vectorised over a g×g grid.
-// Distances via matmul (reuses kmeans squaredDistances); top-k by iterated
-// argmin + masking; votes counted per cell.
+// Distances via matmul (shared squaredDistances); top-k by iterated argmin +
+// masking; votes counted per cell.
 export function classifyGrid(nw: NumWasm, train: KnnPoint[], g: number, k: number): number[] {
   const cells = g * g;
   const classes = Math.max(...train.map((p) => p.label)) + 1;
@@ -44,20 +38,18 @@ export function classifyGrid(nw: NumWasm, train: KnnPoint[], g: number, k: numbe
   const arange = nw.arange(0, n, 1);
   for (let t = 0; t < k; t++) {
     const am = nw.argmin(D, { axis: 1 }) as NdArray;
-    const a = am.toArray().map((v) => Math.round(v));
+    const a = idxVec(am);
     am.free();
     for (let i = 0; i < cells; i++) votes[i * classes + labels[a[i]]]++;
     if (t < k - 1) {
-      const aCol = nw.reshape(nw.array(a), [cells, 1]);
-      const lRow = nw.reshape(arange, [1, n]);
-      const eq = nw.equal(aCol, lRow);
+      const aArr = nw.array(a);
+      const eq = oneHotFromIdx(nw, aArr, n);
+      aArr.free();
       const big = nw.mulScalar(eq, 1e9);
+      eq.free();
       const D2 = nw.add(D, big);
       D.free();
-      eq.free();
       big.free();
-      aCol.free();
-      lRow.free();
       D = D2;
     }
   }

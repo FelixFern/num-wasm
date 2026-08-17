@@ -1,5 +1,5 @@
 import type { NdArray, NumWasm } from "@felixfern/num-wasm/browser";
-import { gaussianField } from "./kmeans";
+import { gaussianField, sleep } from "./util";
 
 export interface PcaStep {
   iteration: number;
@@ -7,8 +7,6 @@ export interface PcaStep {
   angle: number;
   vec: [number, number];
 }
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Anisotropic 2D gaussian: elongated along x-ish, correlated.
 export function generatePcaData(nw: NumWasm, n: number, seed: number, scale = 1.4): { x: number; y: number }[] {

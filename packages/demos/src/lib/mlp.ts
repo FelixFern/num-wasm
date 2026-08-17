@@ -1,5 +1,6 @@
 import type { NumWasm, NdArray } from "@felixfern/num-wasm/browser";
 import type { Dataset } from "./data";
+import { mulberry32, tick } from "./util";
 
 export interface Model {
   nw: NumWasm;
@@ -28,8 +29,6 @@ export interface TrainReport {
   layers: number[][];
   output: number[];
 }
-
-const tick = () => new Promise((r) => setTimeout(r, 0));
 
 export function initModel(
   nw: NumWasm,
@@ -99,17 +98,6 @@ export function modelFromArrays(
   const Ws = w.Ws.map((flat, l) => nw.reshape(nw.array(flat), [sizes[l + 1], sizes[l]]));
   const bs = w.bs.map((flat, l) => nw.reshape(nw.array(flat), [sizes[l + 1], 1]));
   return { nw, Ws, bs, inputSize, hidden, classes };
-}
-
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 function buildX(nw: NumWasm, ds: Dataset, idxs: number[]): NdArray {

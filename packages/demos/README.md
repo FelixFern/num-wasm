@@ -2,8 +2,6 @@
 
 Seven interactive demos that run **entirely in the browser on WebAssembly**, all backed by [`num-wasm`](https://github.com/FelixFern/numwasm) (NumPy-like array ops in Zig, compiled to WASM). Pick a demo from the nav pills.
 
-![logo](./public/logo-512.png)
-
 | Demo | Route | What it shows |
 | --- | --- | --- |
 | **handwritten** | `#/handwritten` | Draw a digit on a 28×28 pad; an MLP reads it back, live per-class confidence |
@@ -29,7 +27,7 @@ Seven interactive demos that run **entirely in the browser on WebAssembly**, all
 
 ### k-means
 
-- Synthetic blob clusters — num-wasm `random` noise around deterministic ring centers (num-wasm has no trig, so the ring is JS geometry).
+- Synthetic blob clusters — num-wasm `random` noise around randomized, well-separated center draws (rejection-sampled via num-wasm `random`; new layout on every Regenerate).
 - Assignment: squared distances via `|p|² + |c|² − 2p·cᵀ` (`matmul`), then `argmin`; membership matrix via broadcast `equal`; centroids as `(GᵀP)/ΣG` in a single `matmul`.
 - K-means++ seeding; scrub slider replays every iteration; inertia sparkline + cluster sizes.
 

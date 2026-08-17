@@ -1,4 +1,5 @@
 import type { NdArray, NumWasm } from "@felixfern/num-wasm/browser";
+import { gaussianField, sleep } from "./util";
 
 export type RegressionKind = "linear" | "logistic";
 
@@ -21,8 +22,6 @@ export interface RegressionOptions {
   delayMs?: number;
   onStep?: (step: RegressionStep) => void;
 }
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // sigmoid(z) = 1 / (1 + e^-z) composed from num-wasm primitives.
 function sigmoid(nw: NumWasm, z: NdArray, ones: NdArray): NdArray {
@@ -47,15 +46,8 @@ export function generateRegressionData(
   const xArr = nw.random([n], seed); // uniform in [0,1]
   let yArr: NdArray;
   if (kind === "linear") {
-    // y = 2.5x - 1 + noise * N(0,1)
-    const S = 8;
-    const u = nw.random([n, S], seed + 1);
-    const sm = nw.sum(u, { axis: 1 }) as NdArray;
-    u.free();
-    const c = nw.addScalar(sm, -S / 2);
-    sm.free();
-    const scaled = nw.mulScalar(c, noise);
-    c.free();
+    // y = 2.5x − 1 + noise·N(0,1)
+    const scaled = nw.array(gaussianField(nw, n, seed + 1, noise));
     const slope = nw.mulScalar(xArr, 2.5);
     const off = nw.addScalar(slope, -1);
     slope.free();
@@ -63,7 +55,7 @@ export function generateRegressionData(
     off.free();
     scaled.free();
   } else {
-    // p = sigmoid(8(x - 0.5)); label = (u < p)
+    // p = sigmoid(8(x − 0.5)); label = (u < p)
     const s4 = nw.mulScalar(xArr, 8);
     const center = nw.addScalar(s4, -4);
     s4.free();

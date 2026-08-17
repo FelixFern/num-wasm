@@ -1,4 +1,5 @@
 import type { NdArray, NumWasm } from "@felixfern/num-wasm/browser";
+import { sleep } from "./util";
 
 export interface MonteStep {
   iteration: number;
@@ -16,8 +17,6 @@ export interface MonteOptions {
   seed: number;
   onStep?: (s: MonteStep) => void;
 }
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // π via hit-or-miss sampling in the unit square: π ≈ 4·inside/total.
 export async function runMonteCarlo(nw: NumWasm, opts: MonteOptions): Promise<MonteStep[]> {
